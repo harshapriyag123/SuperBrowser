@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react'
 import { useContextManager } from './useContextManager'
 import { getApiBase } from './config/apiBase'
+import { ChatSidebar } from './components/ChatSidebar'
 
 const LazyCommunityResults = lazy(() => import('./components/CommunityResults'))
 const LazyBackgroundOrb = lazy(() => import('./components/BackgroundOrb'))
@@ -44,7 +45,8 @@ function createNewTab(sessionId = null) {
     sessionId: sessionId || crypto.randomUUID(),
     history: [],
     browserUrl: "",
-    browserTitle: ""
+    browserTitle: "",
+    showChat: false
   }
 }
 
@@ -335,6 +337,14 @@ export default function App() {
                  <button onClick={() => handleModeChange('seo')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'seo' ? 'active' : ''}`}>SEO</button>
                  <button onClick={() => handleModeChange('ai')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'ai' ? 'active' : ''}`}>AI</button>
                  <button onClick={() => handleModeChange('community')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'community' ? 'active' : ''}`}>REVIEW</button>
+                 <div className="w-[1px] h-6 bg-[var(--border-color)] mx-1" />
+                 <button 
+                   onClick={() => updateTab(activeTabId, { showChat: !activeTab?.showChat })} 
+                   className={`p-2 flex items-center justify-center rounded-full border border-[var(--border-color)] transition-colors hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${activeTab?.showChat ? 'bg-[var(--bg-hover)] text-[var(--action-primary)] border-[var(--action-primary)]' : ''}`}
+                   title="Toggle AI Chat Sidebar"
+                 >
+                   <BrainIcon />
+                 </button>
                </div>
             </div>
             
@@ -350,12 +360,21 @@ export default function App() {
                        <span className="text-sm font-medium text-[var(--text-secondary)]">Persona:</span>
                        <PersonaDropdown value={persona} onChange={setPersona} personas={PERSONAS} />
                      </div>
-                     <ContextIndicator tabId={activeTabId} contextManager={contextManager} onToggleInfo={() => setShowContextInfo(!showContextInfo)} />
+                     <ContextIndicator tabId={activeTabId} contextManager={contextManager} onToggleInfo={() => updateTab(activeTabId, { showChat: !activeTab?.showChat })} />
                    </div>
                  )}
 
                  <ResultsPanel mode={activeTab?.activeMode} results={activeTab?.results} loading={activeTab?.loading} onOpenLink={openInAppUrl} query={activeTab?.query} />
                </div>
+
+               {activeTab?.showChat && (
+                 <ChatSidebar 
+                   tabId={activeTabId} 
+                   appSessionId={activeTab.sessionId} 
+                   onClose={() => updateTab(activeTabId, { showChat: false })}
+                   persona={persona}
+                 />
+               )}
                
                {/* History Panel Sidebar - Now accessed via browser menu */}
                {showHistory && (

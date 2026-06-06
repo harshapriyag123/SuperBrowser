@@ -9,11 +9,12 @@ INITIAL_BACKOFF = 1.0  # seconds
 
 
 async def ask_groq(
-    prompt: str,
+    prompt: str | None = None,
     model: str = "llama-3.1-8b-instant",
     system_prompt: str | None = None,
+    messages: list[dict[str, str]] | None = None,
 ) -> str:
-    """Call Groq API with optional system prompt and model selection.
+    """Call Groq API with optional system prompt, message history, and model selection.
     
     Includes retry logic with exponential backoff for rate limiting (429 errors).
     """
@@ -23,10 +24,16 @@ async def ask_groq(
         return "Groq API key not configured."
 
     # Build messages list
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
+    if messages is not None:
+        messages_list = list(messages)
+        if system_prompt and (not messages_list or messages_list[0].get("role") != "system"):
+            messages_list.insert(0, {"role": "system", "content": system_prompt})
+    else:
+        messages_list = []
+        if system_prompt:
+            messages_list.append({"role": "system", "content": system_prompt})
+        if prompt:
+            messages_list.append({"role": "user", "content": prompt})
 
     last_error = None
     backoff = INITIAL_BACKOFF
@@ -42,7 +49,7 @@ async def ask_groq(
                     },
                     json={
                         "model": model,
-                        "messages": messages,
+                        "messages": messages_list,
                         "max_tokens": 1024,
                         "temperature": 0.7,
                     },

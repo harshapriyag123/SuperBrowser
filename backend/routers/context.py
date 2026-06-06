@@ -4,11 +4,13 @@ Context API Router - Handles context tracking, session lifecycle, chat, and expo
 
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+import uuid
 
 from fastapi import APIRouter, Body
 from pydantic import BaseModel
 
 from services.groq_service import ask_groq
+from database import get_context_db
 
 router = APIRouter()
 
@@ -346,37 +348,88 @@ def _build_context_summary(session_id: str) -> str:
     return "\n".join(summary_parts)
 
 
+class ChatSessionCreate(BaseModel):
+    tab_id: str
+    session_id: Optional[str] = None
+
+
+@router.post("/context/chat/session")
+async def create_chat_session(payload: ChatSessionCreate):
+    """Create a new chat session."""
+    session_id = payload.session_id or str(uuid.uuid4())
+    db = get_context_db()
+    db.create_chat_session(session_id, payload.tab_id)
+    return {"status": "success", "session_id": session_id}
+
+
+@router.get("/context/chat/sessions/{tab_id}")
+async def get_chat_sessions(tab_id: str):
+    """Get all chat sessions for a tab."""
+    db = get_context_db()
+    sessions = db.get_chat_sessions(tab_id)
+    return {"status": "success", "sessions": sessions}
+
+
+@router.delete("/context/chat/session/{session_id}")
+async def delete_chat_session(session_id: str):
+    """Delete a chat session."""
+    db = get_context_db()
+    db.delete_chat_session(session_id)
+    return {"status": "success", "message": "Chat session deleted"}
+
+
+@router.get("/context/chat/messages/{session_id}")
+async def get_chat_messages(session_id: str):
+    """Get all messages for a chat session."""
+    db = get_context_db()
+    messages = db.get_chat_messages(session_id)
+    formatted = []
+    for msg in messages:
+        formatted.append({
+            "id": msg["id"],
+            "text": msg["content"],
+            "sender": "user" if msg["role"] == "user" else "ai",
+            "model": msg["model"],
+            "created_at": msg["created_at"]
+        })
+    return {"status": "success", "messages": formatted}
+
+
 @router.post("/context/chat")
 async def chat_with_context(
     session_id: str = Body(...),
     message: str = Body(...),
     tab_id: Optional[str] = Body(None),
     model: str = Body("llama-3.1-8b-instant"),
+    app_session_id: Optional[str] = Body(None),
 ):
     """
     Chat with AI about the current browsing context.
     The AI has access to all queries, results, and visited pages in the session.
     Supports model selection for different AI capabilities.
     """
-    # Ensure chat history exists for this session
-    if session_id not in _chat_history:
-        _chat_history[session_id] = []
-    
-    # Build context summary
-    context_summary = _build_context_summary(session_id)
-    
-    # Add user message to history
-    _chat_history[session_id].append({"role": "user", "content": message})
-    
-    # Keep only last 10 messages for context
-    recent_history = _chat_history[session_id][-10:]
-    
-    # Build conversation history for the prompt
-    conversation = ""
-    for msg in recent_history[:-1]:  # Exclude current message
-        role = "User" if msg["role"] == "user" else "Assistant"
-        conversation += f"{role}: {msg['content']}\n"
-    
+    db = get_context_db()
+
+    # Save user message to persistent DB
+    user_msg_id = f"msg_{datetime.now().timestamp()}_{uuid.uuid4().hex[:6]}"
+    db.save_chat_message(user_msg_id, session_id, "user", message, model)
+
+    # Retrieve all messages for this chat session from database
+    history = db.get_chat_messages(session_id)
+
+    # Keep only last 10 messages for token efficiency (optional, but good practice)
+    recent_history = history[-10:]
+
+    # Build the prompt payload list for Groq API
+    groq_messages = []
+    for msg in recent_history:
+        groq_messages.append({"role": msg["role"], "content": msg["content"]})
+
+    # Build context summary (browsing queries/results/pages)
+    # If app_session_id is provided, retrieve its context. Otherwise fallback to session_id.
+    context_session_id = app_session_id or session_id
+    context_summary = _build_context_summary(context_session_id)
+
     # System prompt with context
     system_prompt = f"""You are Super AI, an intelligent assistant for the SuperBrowser application.
 You help users understand and analyze their browsing context - the searches they've made, 
@@ -392,32 +445,18 @@ Guidelines:
 - You can suggest related searches or help analyze patterns in their browsing
 - Keep responses focused and under 200 words unless the user asks for more detail"""
 
-    # Build the prompt with conversation history
-    if conversation:
-        prompt = f"""Previous conversation:
-{conversation}
+    # Call Groq API with selected model and message history
+    response = await ask_groq(model=model, system_prompt=system_prompt, messages=groq_messages)
 
-Current user message: {message}
+    # Save assistant response to persistent DB
+    assistant_msg_id = f"msg_{datetime.now().timestamp()}_{uuid.uuid4().hex[:6]}"
+    db.save_chat_message(assistant_msg_id, session_id, "assistant", response, model)
 
-Please respond to the user's message, taking into account the conversation history and the browsing context provided."""
-    else:
-        prompt = message
-    
-    # Call Groq API with selected model
-    response = await ask_groq(prompt=prompt, model=model, system_prompt=system_prompt)
-    
-    # Add assistant response to history
-    _chat_history[session_id].append({"role": "assistant", "content": response})
-    
-    # Keep history limited to last 20 messages
-    if len(_chat_history[session_id]) > 20:
-        _chat_history[session_id] = _chat_history[session_id][-20:]
-    
     return {
         "status": "success",
         "response": response,
         "model_used": model,
-        "context_available": session_id in _context_store and len(_context_store[session_id]) > 0
+        "context_available": context_session_id in _context_store and len(_context_store[context_session_id]) > 0
     }
 
 
@@ -469,6 +508,6 @@ async def get_available_models():
 @router.delete("/context/chat/clear/{session_id}")
 async def clear_chat_history(session_id: str):
     """Clear chat history for a session."""
-    if session_id in _chat_history:
-        del _chat_history[session_id]
+    db = get_context_db()
+    db.clear_chat_history(session_id)
     return {"status": "success", "message": "Chat history cleared"}
