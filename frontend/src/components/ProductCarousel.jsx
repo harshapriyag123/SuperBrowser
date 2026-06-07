@@ -45,8 +45,8 @@ export function ProductCarousel({ products = [] }) {
               </div>
               
               <div>
-                <p className="text-[16px] font-bold text-[var(--text-primary)] tracking-tight mt-1">{product.price}</p>
-                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">{product.source}</p>
+                <p className="text-[16px] font-bold text-[var(--text-primary)] tracking-tight mt-1">{product.price ?? 'Price unavailable'}</p>
+                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">{product.source ?? ''}</p>
               </div>
             </div>
           </a>
