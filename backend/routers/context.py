@@ -2,11 +2,12 @@
 Context API Router - Handles context tracking, session lifecycle, chat, and export.
 """
 
+import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Annotated
 
 from fastapi import APIRouter, Body
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from services.groq_service import ask_groq
 
@@ -25,18 +26,36 @@ _session_store: Dict[str, Dict[str, Optional[str]]] = {}
 _chat_history: Dict[str, List[Dict[str, str]]] = {}
 
 
+SESSION_TTL_SECONDS = 3600  # 1 hour
+
+def evict_expired_sessions():
+    now = time.time()
+    expired = [k for k, v in _session_store.items()
+               if now - v.get("last_accessed", 0) > SESSION_TTL_SECONDS]
+    for k in expired:
+        _context_store.pop(k, None)
+        _session_store.pop(k, None)
+        _chat_history.pop(k, None)
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
 def _ensure_session(session_id: str) -> None:
+    evict_expired_sessions()
+    now = time.time()
+    
     if session_id not in _session_store:
         _session_store[session_id] = {
             "session_id": session_id,
             "started_at": _utc_now_iso(),
             "ended_at": None,
             "status": "active",
+            "last_accessed": now,
         }
+    else:
+        _session_store[session_id]["last_accessed"] = now
 
     if session_id not in _context_store:
         _context_store[session_id] = {}
@@ -72,37 +91,37 @@ def _session_stats(session_id: str) -> Dict[str, int]:
 class QueryRecord(BaseModel):
     """Model for a search query"""
 
-    query: str
-    mode: str
-    timestamp: str
+    query: str = Field(..., max_length=1000)
+    mode: str = Field(..., max_length=50)
+    timestamp: str = Field(..., max_length=50)
 
 
 class ResultRecord(BaseModel):
     """Model for a search result"""
 
-    url: str
-    title: str
-    snippet: str
-    content: Optional[str] = ""
+    url: str = Field(..., max_length=2048)
+    title: str = Field(..., max_length=500)
+    snippet: str = Field(..., max_length=2000)
+    content: Optional[str] = Field(default="", max_length=50000)
 
 
 class VisitedPage(BaseModel):
     """Model for a visited/clicked page"""
 
-    url: str
-    title: str
-    content: str
-    timestamp: str
+    url: str = Field(..., max_length=2048)
+    title: str = Field(..., max_length=500)
+    content: str = Field(..., max_length=100000)
+    timestamp: str = Field(..., max_length=50)
 
 
 class ContextUpdate(BaseModel):
     """Model for updating tab context"""
 
-    session_id: str
-    tab_id: str
-    queries: Optional[List[str]] = None
-    results: Optional[List[ResultRecord]] = None
-    visited_pages: Optional[List[VisitedPage]] = None
+    session_id: str = Field(..., max_length=100)
+    tab_id: str = Field(..., max_length=100)
+    queries: Optional[List[Annotated[str, Field(max_length=1000)]]] = Field(default=None, max_length=20)
+    results: Optional[List[ResultRecord]] = Field(default=None, max_length=20)
+    visited_pages: Optional[List[VisitedPage]] = Field(default=None, max_length=50)
 
 
 @router.post("/context/session/start")
