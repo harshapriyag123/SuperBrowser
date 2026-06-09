@@ -254,7 +254,7 @@ export default function App() {
 
         {isBrowserTab ? (
           <div className="flex-1 min-h-0 bg-[var(--bg-surface)]">
-            <BrowserPanel url={activeTab.browserUrl} title={activeTab.browserTitle} onClose={() => updateTab(activeTabId, { browserUrl: "", browserTitle: "" })} />
+            <BrowserPanel tabId={activeTabId} url={activeTab.browserUrl} title={activeTab.browserTitle} onClose={() => updateTab(activeTabId, { browserUrl: "", browserTitle: "" })} />
           </div>
         ) : isNewTab ? (
           /* Hand-drawn Centered Landing Page */
@@ -749,8 +749,8 @@ function ContextWindow({ show, onClose, tabId, sessionId, contextManager }) {
 
 function BackendStatusBanner() { return null } // Hidden for minimalist aesthetic
 
-function BrowserPanel({ url, title, onClose }) {
-  const reloadWebview = () => document.getElementById(`webview-${url}`)?.reload()
+function BrowserPanel({ tabId, url, title, onClose }) {
+  const reloadWebview = () => document.getElementById(`webview-${tabId}`)?.reload()
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-surface)] animate-fade-in-up">
@@ -762,7 +762,7 @@ function BrowserPanel({ url, title, onClose }) {
         </div>
         <input value={url} readOnly className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-color)] text-sm rounded-lg px-3 py-1.5 outline-none text-[var(--text-secondary)]" />
       </div>
-      <webview id={`webview-${url}`} src={url} className="w-full flex-1" style={{ minHeight: 0 }} allowpopups="true" />
+      <webview id={`webview-${tabId}`} src={url} className="w-full flex-1" style={{ minHeight: 0 }} allowpopups="true" />
     </div>
   )
 }
