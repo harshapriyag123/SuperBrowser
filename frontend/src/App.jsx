@@ -79,6 +79,7 @@ const SunIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none
 const MoonIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5Z"/></svg>
 
 export default function App() {
+  const [theme, setTheme] = useState(getInitialTheme)
   const [appSessionId] = useState(() => crypto.randomUUID())
   const [sessionStartedAt] = useState(() => new Date().toISOString())
   const [sessionStatus, setSessionStatus] = useState("starting")
@@ -91,7 +92,7 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false)
   const [showPricing, setShowPricing] = useState(false)
   const [persona, setPersona] = useState("default")
-  const [theme, setTheme] = useState(getInitialTheme)
+
   const [showContextInfo, setShowContextInfo] = useState(false)
   const [backendStatus, setBackendStatus] = useState(null)
   const [userRegion] = useState(() => {
@@ -105,17 +106,11 @@ export default function App() {
   const searchControllersRef = useRef({})
   const contextManager = useContextManager()
   const activeTab = tabs.find(t => t.id === activeTabId)
-  
+
   const isBrowserTab = Boolean(activeTab?.browserUrl)
   // Only transition out of New Tab when a search is loading, finished, or has errored
   const isNewTab = !activeTab?.results && !activeTab?.loading && !activeTab?.error && !isBrowserTab
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
-    } catch {}
-  }, [theme])
 
   const toggleTheme = useCallback(() => {
     setTheme(current => current === 'dark' ? 'light' : 'dark')
@@ -125,6 +120,12 @@ export default function App() {
     if (!window.superBrowserDesktop?.isElectron || !window.superBrowserDesktop?.backend?.getStatus) return
     window.superBrowserDesktop.backend.getStatus().then(setBackendStatus).catch(() => {})
   }, [])
+useEffect(() => {
+  document.documentElement.dataset.theme = theme
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {}
+}, [theme])
 
   useEffect(() => {
     contextManager.startSession(appSessionId)
@@ -245,7 +246,7 @@ export default function App() {
         onShowHistory={() => { setShowPricing(false); setShowHistory(true) }}
         onOpenPricing={() => { setShowHistory(false); setShowPricing(true) }}
         theme={theme}
-        onToggleTheme={toggleTheme}
+       onToggleTheme={toggleTheme}  // PASSING THEME & TOGGLE fUNCTION TO TABBAR FOR THEME TOGGLE BUTTON
       />
 
       {/* Main Content */}
@@ -414,6 +415,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
           BROWSER MENU
         </button>
         {isMenuOpen && <BrowserMenu onClose={() => setIsMenuOpen(false)} onAddTab={onAddTab} onShowHistory={onShowHistory} onOpenPricing={onOpenPricing} />}
+        
+        {/* Theme Toggle Button */}
         <button
           type="button"
           onClick={onToggleTheme}
@@ -424,6 +427,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
         >
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
+        
+        {/* Pricing Button */}
         <button
           onClick={() => { setIsMenuOpen(false); onOpenPricing() }}
           className="px-4 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border-l border-[var(--border-color)]"
@@ -431,6 +436,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
         >
           PRICING
         </button>
+        
+        {/* Window Controls */}
         <div className="flex h-full pl-1 border-l border-[var(--border-color)]">
           <button onClick={() => window.superBrowserDesktop?.minimize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Minimize"><MinusIcon /></button>
           <button onClick={() => window.superBrowserDesktop?.maximize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Maximize"><SquareIcon /></button>

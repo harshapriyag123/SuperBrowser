@@ -1,8 +1,9 @@
 @import "tailwindcss";
-
-/* ============================================================
-   SuperBrowser Design System — Main Minimalist White Theme
-   ============================================================ */
+/****
+ * SuperBrowser Theme Variables
+ * Light Mode: Default
+ * Dark Mode: When data-theme='dark'
+ ****/
 
 :root {
   /* Typography */
