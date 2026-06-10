@@ -254,6 +254,14 @@ async function startBackend() {
   const port = await findAvailablePort();
   backendBaseUrl = `http://${BACKEND_HOST}:${port}`;
   process.env.SUPERBROWSER_BACKEND_URL = backendBaseUrl;
+  
+  const settings = readSettings();
+  if (!settings.sessionToken) {
+    settings.sessionToken = require("crypto").randomBytes(32).toString('base64url');
+    writeSettings({ sessionToken: settings.sessionToken });
+  }
+  process.env.SUPERBROWSER_SESSION_TOKEN = settings.sessionToken;
+  
   backendStatus = { running: false, url: backendBaseUrl, pid: null, lastError: null };
 
   const packagedExe = resolvePackagedBackendExecutable();
@@ -329,6 +337,12 @@ function stopBackend() {
 }
 
 function registerIpcHandlers() {
+  const fetchContext = async (path, options = {}) => {
+    const token = process.env.SUPERBROWSER_SESSION_TOKEN || readSettings().sessionToken;
+    const headers = { ...options.headers, "x-session-token": token };
+    return fetch(`${backendBaseUrl}${path}`, { ...options, headers });
+  };
+
   ipcMain.handle("backend:get-status", () => backendStatus);
   ipcMain.handle("backend:get-url", () => backendBaseUrl);
 
@@ -340,17 +354,98 @@ function registerIpcHandlers() {
     return writeSettings(partialSettings);
   });
 
+  ipcMain.handle("context:start-session", async (_, { sessionId }) => {
+    validateString(sessionId, "sessionId");
+    const res = await fetchContext(`/api/context/session/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId })
+    });
+    if (!res.ok) throw new Error(`Failed to start session: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:stop-session", async (_, { sessionId, options }) => {
+    validateString(sessionId, "sessionId");
+    const res = await fetchContext(`/api/context/session/stop/${sessionId}`, {
+      method: "POST",
+      keepalive: options?.keepalive
+    });
+    if (!res.ok) throw new Error(`Failed to stop session: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:add-query", async (_, { sessionId, tabId, query, mode }) => {
+    validateString(sessionId, "sessionId");
+    validateString(tabId, "tabId");
+    const res = await fetchContext(`/api/context/add_query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, tab_id: tabId, query, mode })
+    });
+    if (!res.ok) throw new Error(`Failed to add query: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:add-results", async (_, { sessionId, tabId, results }) => {
+    validateString(sessionId, "sessionId");
+    validateString(tabId, "tabId");
+    const res = await fetchContext(`/api/context/add_results`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, tab_id: tabId, results })
+    });
+    if (!res.ok) throw new Error(`Failed to add results: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:add-visited-page", async (_, { sessionId, tabId, page }) => {
+    validateString(sessionId, "sessionId");
+    validateString(tabId, "tabId");
+    const res = await fetchContext(`/api/context/add_visited_page`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, tab_id: tabId, page })
+    });
+    if (!res.ok) throw new Error(`Failed to add visited page: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:export-session", async (_, { sessionId }) => {
+    validateString(sessionId, "sessionId");
+    const res = await fetchContext(`/api/context/export/${sessionId}`);
+    if (!res.ok) throw new Error(`Failed to export session context: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:get-models", async () => {
+    const res = await fetchContext(`/api/context/models`);
+    if (!res.ok) throw new Error(`Failed to get models: ${res.status}`);
+    return res.json();
+  });
+
+  ipcMain.handle("context:chat", async (_, { sessionId, message, tabId, model }) => {
+    validateString(sessionId, "sessionId");
+    const res = await fetchContext(`/api/context/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, message, tab_id: tabId, model })
+    });
+    if (!res.ok) throw new Error(`Failed to chat: ${res.status}`);
+    return res.json();
+  });
+
   ipcMain.handle("context:get-tab", async (_, { sessionId, tabId }) => {
     validateString(sessionId, "sessionId");
     validateString(tabId, "tabId");
-    const res = await fetch(`${backendBaseUrl}/api/context/get/${sessionId}/${tabId}`);
+    const res = await fetchContext(`/api/context/get/${sessionId}/${tabId}`);
     if (!res.ok) throw new Error(`Failed to fetch tab context: ${res.status}`);
     return res.json();
   });
 
   ipcMain.handle("context:get-session", async (_, { sessionId }) => {
     validateString(sessionId, "sessionId");
-    const res = await fetch(`${backendBaseUrl}/api/context/session/${sessionId}`);
+    const res = await fetchContext(`/api/context/session/${sessionId}`);
     if (!res.ok) throw new Error(`Failed to fetch session context: ${res.status}`);
     return res.json();
   });
@@ -358,7 +453,7 @@ function registerIpcHandlers() {
   ipcMain.handle("context:clear-tab", async (_, { sessionId, tabId }) => {
     validateString(sessionId, "sessionId");
     validateString(tabId, "tabId");
-    const res = await fetch(`${backendBaseUrl}/api/context/clear/${sessionId}/${tabId}`, {
+    const res = await fetchContext(`/api/context/clear/${sessionId}/${tabId}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(`Failed to clear tab context: ${res.status}`);

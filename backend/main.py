@@ -1,7 +1,16 @@
 import os
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Run database setup if database/context_db.py does not exist
+backend_dir = Path(__file__).parent
+sys.path.append(str(backend_dir))
+db_file = backend_dir / "database" / "context_db.py"
+if not db_file.exists():
+    import setup_database
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

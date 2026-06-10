@@ -19,8 +19,15 @@ contextBridge.exposeInMainWorld("superBrowserDesktop", {
   context: {
     getTab: (sessionId, tabId) => safeInvoke("context:get-tab", { sessionId, tabId }),
     getSession: (sessionId) => safeInvoke("context:get-session", { sessionId }),
-    clearTab: (sessionId, tabId) =>
-      safeInvoke("context:clear-tab", { sessionId, tabId }),
+    clearTab: (sessionId, tabId) => safeInvoke("context:clear-tab", { sessionId, tabId }),
+    startSession: (sessionId) => safeInvoke("context:start-session", { sessionId }),
+    stopSession: (sessionId, options) => safeInvoke("context:stop-session", { sessionId, options }),
+    addQuery: (sessionId, tabId, query, mode) => safeInvoke("context:add-query", { sessionId, tabId, query, mode }),
+    addResults: (sessionId, tabId, results) => safeInvoke("context:add-results", { sessionId, tabId, results }),
+    addVisitedPage: (sessionId, tabId, page) => safeInvoke("context:add-visited-page", { sessionId, tabId, page }),
+    exportSession: (sessionId) => safeInvoke("context:export-session", { sessionId }),
+    getModels: () => safeInvoke("context:get-models"),
+    chat: (sessionId, message, tabId, model) => safeInvoke("context:chat", { sessionId, message, tabId, model }),
   },
   app: {
     notify: (title, body) => safeInvoke("app:notify", { title, body }),

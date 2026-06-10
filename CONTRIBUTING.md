@@ -253,10 +253,17 @@ Labels are managed by maintainers. Contributors should not pressure maintainers 
 
 ## Review Process
 
+> ⭐ **Star the repository before your PR can be merged.** Contributors are
+> required to star [SuperBrowser](https://github.com/PandyaJeet/SuperBrowser)
+> before a pull request is merged. A workflow checks this automatically and
+> reports a `star-check` status on your PR — maintainers will not merge a PR
+> from a contributor who has not starred the repo.
+
 1. A maintainer reviews the PR.
 2. If changes are requested, address them in the same branch.
 3. Reply with a short summary of what changed after pushing updates.
-4. Wait for approval and merge.
+4. Make sure you have starred the repository (see the note above).
+5. Wait for approval and merge.
 
 Please do not create repeated status comments. One clear follow-up after addressing feedback is enough.
 

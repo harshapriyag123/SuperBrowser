@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react'
 import { useContextManager } from './useContextManager'
 import { getApiBase } from './config/apiBase'
 import { exportSessionToMarkdown } from './utils/exportSession'
+import { ChatSidebar } from './components/ChatSidebar'
 
 const LazyCommunityResults = lazy(() => import('./components/CommunityResults'))
 const LazyBackgroundOrb = lazy(() => import('./components/BackgroundOrb'))
@@ -45,7 +46,8 @@ function createNewTab(sessionId = null) {
     sessionId: sessionId || crypto.randomUUID(),
     history: [],
     browserUrl: "",
-    browserTitle: ""
+    browserTitle: "",
+    showChat: false
   }
 }
 
@@ -83,7 +85,7 @@ export default function App() {
   const [sessionStartedAt] = useState(() => new Date().toISOString())
   const [sessionStatus, setSessionStatus] = useState("starting")
   const [tabsState] = useState(() => {
-    const initialTab = createNewTab()
+    const initialTab = createNewTab(appSessionId)
     return { tabs: [initialTab], activeId: initialTab.id }
   })
   const [tabs, setTabs] = useState(tabsState.tabs)
@@ -218,8 +220,22 @@ export default function App() {
     if (tabId === activeTabId) setActiveTabId(nTabs[Math.max(0, tabs.findIndex(t => t.id === tabId) - 1)].id)
   }
   function handleHistoryClick(item) { updateTab(activeTabId, { query: item.query, activeMode: item.mode }); setTimeout(() => handleSearch(activeTabId, persona), 0) }
+
+  function isSafeUrl(url) {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch (e) {
+      return false
+    }
+  }
+
   function openInAppUrl(url, title = "Web Page") {
     if (!url) return
+    if (!isSafeUrl(url)) {
+      console.warn('Blocked unsafe URL:', url)
+      return
+    }
     const bt = createNewTab(appSessionId); bt.browserUrl = url; bt.browserTitle = title; bt.title = (title || "Web").slice(0, 25); bt.query = url
     setTabs(p => [...p, bt]); setActiveTabId(bt.id)
     if (activeTab) contextManager.addVisitedPage(activeTabId, activeTab.sessionId, url, title, `Visited: ${url}`)
@@ -252,7 +268,7 @@ export default function App() {
 
         {isBrowserTab ? (
           <div className="flex-1 min-h-0 bg-[var(--bg-surface)]">
-            <BrowserPanel url={activeTab.browserUrl} title={activeTab.browserTitle} onClose={() => updateTab(activeTabId, { browserUrl: "", browserTitle: "" })} />
+            <BrowserPanel tabId={activeTabId} url={activeTab.browserUrl} title={activeTab.browserTitle} onClose={() => updateTab(activeTabId, { browserUrl: "", browserTitle: "" })} />
           </div>
         ) : isNewTab ? (
           <div className="flex-1 flex flex-col items-center justify-center p-4 animate-fade-in-up">
@@ -287,84 +303,104 @@ export default function App() {
         ) : (
           <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-surface)] shadow-xl relative z-10">
             <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center gap-4 bg-[var(--bg-surface)]">
-              <div className="flex items-center gap-1">
-                <button onClick={() => {
-                  if (activeTab?.history && activeTab.history.length > 1) {
-                    const prev = activeTab.history[activeTab.history.length - 2];
-                    updateTab(activeTabId, { query: prev.query, activeMode: prev.mode, history: activeTab.history.slice(0, -1) });
-                    setTimeout(() => handleSearch(activeTabId, persona), 0);
-                  } else {
-                    goHome();
-                  }
-                }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Back">
-                  <ChevronLeftIcon />
-                </button>
-                <button disabled className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] opacity-30 cursor-not-allowed transition-colors" title="Forward">
-                  <ChevronRightIcon />
-                </button>
-                <button onClick={() => { if (activeTab?.query) handleSearch(activeTabId, persona) }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Reload">
-                  <RefreshIcon />
-                </button>
-                <button onClick={goHome} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Home">
-                  <HomeIcon />
-                </button>
-              </div>
+               {/* Browser Navigation Controls */}
+               <div className="flex items-center gap-1">
+                 <button onClick={() => {
+                   if (activeTab?.history && activeTab.history.length > 1) {
+                     const prev = activeTab.history[activeTab.history.length - 2];
+                     updateTab(activeTabId, { query: prev.query, activeMode: prev.mode, history: activeTab.history.slice(0, -1) });
+                     setTimeout(() => handleSearch(activeTabId, persona), 0);
+                   } else {
+                     goHome();
+                   }
+                 }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Back">
+                   <ChevronLeftIcon />
+                 </button>
+                 <button disabled className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] opacity-30 cursor-not-allowed transition-colors" title="Forward">
+                   <ChevronRightIcon />
+                 </button>
+                 <button onClick={() => { if (activeTab?.query) handleSearch(activeTabId, persona) }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Reload">
+                   <RefreshIcon />
+                 </button>
+                 <button onClick={goHome} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Home">
+                   <HomeIcon />
+                 </button>
+               </div>
 
-              <div className="pill-search flex items-center px-5 py-2.5 flex-1 max-w-3xl">
-                {activeTab?.loading ? <div className="w-[18px] h-[18px] rounded-full border-2 border-[var(--border-color)] border-t-[var(--action-primary)] animate-spin" /> : <span className="text-[var(--text-tertiary)]"><SearchIcon /></span>}
-                <input type="text" value={activeTab?.query || ''}
-                  onChange={(e) => updateTab(activeTabId, { query: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch(activeTabId, persona)}
-                  placeholder="Search..."
-                  className="flex-1 ml-3 outline-none text-base bg-transparent text-[var(--text-primary)]" />
-                <button
-                  onClick={() => handleSearch(activeTabId, persona)}
-                  disabled={!activeTab?.query?.trim() || activeTab?.loading}
-                  className="ml-2 px-4 py-1.5 rounded-full bg-[var(--action-primary)] text-white text-sm font-medium hover:bg-[var(--action-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Search
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleModeChange('seo')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'seo' ? 'active' : ''}`}>SEO</button>
-                <button onClick={() => handleModeChange('ai')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'ai' ? 'active' : ''}`}>AI</button>
-                <button onClick={() => handleModeChange('community')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'community' ? 'active' : ''}`}>REVIEW</button>
-              </div>
+               <div className="pill-search flex items-center px-5 py-2.5 flex-1 max-w-3xl">
+                  {activeTab?.loading ? <div className="w-[18px] h-[18px] rounded-full border-2 border-[var(--border-color)] border-t-[var(--action-primary)] animate-spin" /> : <span className="text-[var(--text-tertiary)]"><SearchIcon /></span>}
+                  <input type="text" value={activeTab?.query || ''} 
+                    onChange={(e) => updateTab(activeTabId, { query: e.target.value })} 
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch(activeTabId, persona)}
+                    placeholder="Search..."
+                    className="flex-1 ml-3 outline-none text-base bg-transparent text-[var(--text-primary)]" />
+                  <button 
+                    onClick={() => handleSearch(activeTabId, persona)} 
+                    disabled={!activeTab?.query?.trim() || activeTab?.loading}
+                    className="ml-2 px-4 py-1.5 rounded-full bg-[var(--action-primary)] text-white text-sm font-medium hover:bg-[var(--action-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Search
+                  </button>
+               </div>
+               <div className="flex items-center gap-2">
+                 <button onClick={() => handleModeChange('seo')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'seo' ? 'active' : ''}`}>SEO</button>
+                 <button onClick={() => handleModeChange('ai')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'ai' ? 'active' : ''}`}>AI</button>
+                 <button onClick={() => handleModeChange('community')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'community' ? 'active' : ''}`}>REVIEW</button>
+                 <div className="w-[1px] h-6 bg-[var(--border-color)] mx-1" />
+                 <button 
+                   onClick={() => updateTab(activeTabId, { showChat: !activeTab?.showChat })} 
+                   className={`p-2 flex items-center justify-center rounded-full border border-[var(--border-color)] transition-colors hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] ${activeTab?.showChat ? 'bg-[var(--bg-hover)] text-[var(--action-primary)] border-[var(--action-primary)]' : ''}`}
+                   title="Toggle AI Chat Sidebar"
+                 >
+                   <BrainIcon />
+                 </button>
+               </div>
             </div>
 
             <div className="flex-1 flex overflow-hidden bg-[var(--bg-surface)]">
-              <div className="flex-1 overflow-auto p-6 md:p-10 max-w-5xl mx-auto">
-                {activeTab?.error && <div className="text-red-700 border border-red-200 bg-red-50 p-4 rounded-xl mb-6 text-sm max-w-4xl mx-auto">{activeTab.error}</div>}
+               <div className="flex-1 overflow-auto p-6 md:p-10 max-w-5xl mx-auto">
+                 {activeTab?.error && <div className="text-red-700 border border-red-200 bg-red-50 p-4 rounded-xl mb-6 text-sm max-w-4xl mx-auto">{activeTab.error}</div>}
+                 
+                 {/* AI Persona Bar inside results area for cleaner header */}
+                 {activeTab?.activeMode === 'ai' && (
+                   <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center">
+                     <div className="flex items-center gap-3">
+                       <span className="text-sm font-medium text-[var(--text-secondary)]">Persona:</span>
+                       <PersonaDropdown value={persona} onChange={setPersona} personas={PERSONAS} />
+                     </div>
+                     <ContextIndicator tabId={activeTabId} contextManager={contextManager} onToggleInfo={() => updateTab(activeTabId, { showChat: !activeTab?.showChat })} />
+                   </div>
+                 )}
 
-                {activeTab?.activeMode === 'ai' && (
-                  <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-[var(--text-secondary)]">Persona:</span>
-                      <PersonaDropdown value={persona} onChange={setPersona} personas={PERSONAS} />
-                    </div>
-                    <ContextIndicator tabId={activeTabId} contextManager={contextManager} onToggleInfo={() => setShowContextInfo(!showContextInfo)} />
-                  </div>
-                )}
+                 <ResultsPanel mode={activeTab?.activeMode} results={activeTab?.results} loading={activeTab?.loading} onOpenLink={openInAppUrl} query={activeTab?.query} />
+               </div>
 
-                <ResultsPanel mode={activeTab?.activeMode} results={activeTab?.results} loading={activeTab?.loading} onOpenLink={openInAppUrl} query={activeTab?.query} />
-              </div>
-
-              {showHistory && (
-                <div className="w-80 border-l border-[var(--border-color)] bg-[var(--bg-surface)] p-4 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-[var(--text-primary)]">Tab History</h3>
-                    <button onClick={() => setShowHistory(false)} className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]"><XIcon /></button>
-                  </div>
-                  <div className="space-y-2">
-                    {activeTab?.history?.slice().reverse().map((item, i) => (
-                      <button key={i} onClick={() => handleHistoryClick(item)} className="w-full text-left p-3 rounded-lg border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-hover)] transition-colors">
-                        <p className="text-sm truncate mb-1 text-[var(--text-primary)]">{item.query}</p>
-                        <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">{item.mode}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+               {activeTab?.showChat && (
+                 <ChatSidebar 
+                   tabId={activeTabId} 
+                   appSessionId={activeTab.sessionId} 
+                   onClose={() => updateTab(activeTabId, { showChat: false })}
+                   persona={persona}
+                 />
+               )}
+               
+               {/* History Panel Sidebar - Now accessed via browser menu */}
+               {showHistory && (
+                 <div className="w-80 border-l border-[var(--border-color)] bg-[var(--bg-surface)] p-4 overflow-y-auto">
+                   <div className="flex items-center justify-between mb-4">
+                     <h3 className="font-semibold text-[var(--text-primary)]">Tab History</h3>
+                     <button onClick={() => setShowHistory(false)} className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)]"><XIcon /></button>
+                   </div>
+                   <div className="space-y-2">
+                     {activeTab?.history?.slice().reverse().map((item, i) => (
+                       <button key={i} onClick={() => handleHistoryClick(item)} className="w-full text-left p-3 rounded-lg border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-hover)] transition-colors">
+                         <p className="text-sm truncate mb-1 text-[var(--text-primary)]">{item.query}</p>
+                         <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] uppercase">{item.mode}</span>
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+               )}
             </div>
           </div>
         )}
@@ -583,15 +619,22 @@ function ContextWindow({ show, onClose, tabId, sessionId, contextManager }) {
 
   useEffect(() => {
     if (show) {
-      fetch(`${API_BASE}/api/context/models`)
-        .then(r => r.json())
-        .then(data => {
+      const fetchModels = async () => {
+        try {
+          let data;
+          if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.getModels) {
+            data = await window.superBrowserDesktop.context.getModels();
+          } else {
+            const r = await fetch(`${API_BASE}/api/context/models`);
+            data = await r.json();
+          }
           if (data.models) {
             setModels(data.models)
             setSelectedModel(data.default || 'llama-3.1-8b-instant')
           }
-        })
-        .catch(() => { })
+        } catch (e) {}
+      };
+      fetchModels();
     }
   }, [show])
 
@@ -617,23 +660,26 @@ function ContextWindow({ show, onClose, tabId, sessionId, contextManager }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch(`${API_BASE}/api/context/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: text,
-          tab_id: tabId,
-          model: selectedModel
-        })
-      })
+      let data;
+      if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.chat) {
+        data = await window.superBrowserDesktop.context.chat(sessionId, text, tabId, selectedModel);
+      } else {
+        const response = await fetch(`${API_BASE}/api/context/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: text,
+            tab_id: tabId,
+            model: selectedModel
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`Chat failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
+        if (!response.ok) {
+          throw new Error(`Chat failed: ${response.status}`);
+        }
+        data = await response.json();
+      }      
       const aiReply = {
         id: (Date.now() + 1).toString(),
         text: data.response || 'Sorry, I could not generate a response.',
@@ -722,8 +768,26 @@ function ContextWindow({ show, onClose, tabId, sessionId, contextManager }) {
 
 function BackendStatusBanner() { return null }
 
-function BrowserPanel({ url, title, onClose }) {
-  const reloadWebview = () => document.getElementById(`webview-${url}`)?.reload()
+function BrowserPanel({ tabId, url, title, onClose }) {
+  const webviewRef = useRef(null)
+  const reloadWebview = () => webviewRef.current?.reload()
+
+  useEffect(() => {
+    const webview = webviewRef.current
+    if (!webview) return
+
+    const handleWillNavigate = (e) => {
+      if (!isSafeUrl(e.url)) {
+        console.warn("Prevented unsafe in-app navigation in webview:", e.url)
+        e.preventDefault()
+      }
+    }
+
+    webview.addEventListener('will-navigate', handleWillNavigate)
+    return () => {
+      webview.removeEventListener('will-navigate', handleWillNavigate)
+    }
+  }, [tabId])
 
   return (
     <div className="h-full flex flex-col bg-[var(--bg-surface)] animate-fade-in-up">
@@ -735,7 +799,7 @@ function BrowserPanel({ url, title, onClose }) {
         </div>
         <input value={url} readOnly className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-color)] text-sm rounded-lg px-3 py-1.5 outline-none text-[var(--text-secondary)]" />
       </div>
-      <webview id={`webview-${url}`} src={url} className="w-full flex-1" style={{ minHeight: 0 }} allowpopups="true" />
+      <webview ref={webviewRef} id={`webview-${tabId}`} src={url} className="w-full flex-1" style={{ minHeight: 0 }} />
     </div>
   )
 }

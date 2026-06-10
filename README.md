@@ -1,334 +1,361 @@
+<div align="center">
+
 # 🌐 SuperBrowser
 
-> An intelligent browser powered by AI, combining advanced search capabilities with context-aware AI interactions.
+### An AI-native browser that searches across engines, understands what you're researching, and answers with context.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-success?style=for-the-badge)](https://superbrowser-d6441.web.app/)
-[![Download](https://img.shields.io/badge/Download-EXE-blue?style=for-the-badge)](https://superbrowser-d6441.web.app/)
+SuperBrowser pairs a **multi-engine search aggregator** with a **context-aware AI** that remembers what you've searched and read — per tab — to deliver smarter, grounded answers. It ships as both a **web app** and a **cross-platform desktop app**.
+
+<br/>
+
+[![Live Demo](https://img.shields.io/badge/Live-Demo-22c55e?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://superbrowser-d6441.web.app/)
+[![Download Desktop](https://img.shields.io/badge/Download-Desktop_App-3b82f6?style=for-the-badge&logo=electron&logoColor=white)](https://superbrowser-d6441.web.app/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)](./LICENSE)
+
+![React](https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python_3.8+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-2C2E3B?style=flat-square&logo=electron&logoColor=9FEAF9)
+![TailwindCSS](https://img.shields.io/badge/Tailwind-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-F55036?style=flat-square&logo=groq&logoColor=white)
+
+</div>
+
+---
 
 ## 🚀 Quick Links
 
-- **🌐 Live Website**: [https://superbrowser.web.app/](https://superbrowser.web.app/)
-- **💾 Download EXE**: Visit the [live website](https://superbrowser-d6441.web.app/) to download the desktop application
+| | |
+|---|---|
+| 🌐 **Live Web App** | [superbrowser-d6441.web.app](https://superbrowser-d6441.web.app/) |
+| 💾 **Desktop App** | Download `.exe` / `.dmg` / `.AppImage` from the [live website](https://superbrowser-d6441.web.app/) |
+| 📦 **Repository** | [github.com/PandyaJeet/SuperBrowser](https://github.com/PandyaJeet/SuperBrowser) |
+| 🤝 **Contributing** | [CONTRIBUTING.md](./CONTRIBUTING.md) · [Code of Conduct](./CODE_OF_CONDUCT.md) |
 
 ---
 
 ## 📋 Table of Contents
 
+- [Why SuperBrowser?](#-why-superbrowser)
 - [Features](#-features)
+- [How It Works](#-how-it-works)
 - [Architecture](#-architecture)
-- [Installation](#-installation)
+- [Tech Stack](#-tech-stack)
+- [Getting Started](#-getting-started)
 - [Configuration](#-configuration)
-- [Usage](#-usage)
-- [API Documentation](#-api-documentation)
+- [Running the Desktop App](#-running-the-desktop-app)
+- [API Reference](#-api-reference)
+- [Project Structure](#-project-structure)
 - [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 💡 Why SuperBrowser?
+
+Traditional search hands you ten blue links and forgets everything the moment you click away. SuperBrowser does three things differently:
+
+1. **🔎 One query, many engines.** It searches Google, Bing, and DuckDuckGo at once — with automatic scraper fallbacks if an API call fails — so you get broader, deduplicated results from a single box.
+2. **🧠 It remembers your research.** Every query you run and every page you open is captured into a **per-tab context**. Open a new tab and you get a clean slate; stay in one and your trail compounds.
+3. **🤖 The AI uses that context.** When you switch to AI mode and ask a follow-up, the assistant already knows what you've been looking at — so answers are grounded in *your* session, not generic.
+
+The result is a research loop: **Search → Context captured → Ask AI → Smarter answer.**
 
 ---
 
 ## ✨ Features
 
-### 🔍 SuperSEO - Multi-Engine Search
-- **Multiple Search Engines**: Google, Bing, DuckDuckGo
-- **Smart Fallback**: Automatically falls back to scrapers if API fails
-- **Real-time Results**: Fast and accurate search results
-- **Unified Interface**: One search box, multiple sources
+### 🔍 SuperSEO — Multi-Engine Search
+- **Aggregated results** from Google, Bing, and DuckDuckGo behind one search box.
+- **Resilient fallback:** if [SerpAPI](https://serpapi.com) returns nothing or errors, SuperBrowser transparently switches to direct web scrapers (BeautifulSoup) for the same engine.
+- **Deduplication & ranking** across sources, plus **Google Shopping** results for product queries.
+- **Response caching** with `X-Cache: HIT/MISS` headers to keep repeat searches fast.
 
-### 🤖 SuperAI - Context-Aware AI
-- **Multiple AI Personas**: ChatGPT, Claude, Gemini, and more
-- **Context Tracking**: Remembers your searches and browsing history per tab
-- **Smart Responses**: AI uses your browsing context for better answers
-- **Per-Tab Intelligence**: Each tab maintains independent context
+### 🤖 SuperAI — Persona-Based, Context-Aware Chat
+- **Five answer styles:** `default`, `chatgpt`, `gemini`, `perplexity`, and `claude`, each driven by its own system prompt.
+- **Smart live-data routing:** a lightweight classifier decides whether your question needs *fresh web data* (prices, comparisons, news) or can be answered from the model's *general knowledge* — and only scrapes when it helps.
+- **Grounded in your session:** the assistant references your recent searches and visited pages for relevant, personalized answers.
+- Powered by **Groq** for low-latency inference across Llama 3.1/3.3, Mixtral, and Gemma models.
 
-### 🎯 Smart Context Management
-- Tracks search queries automatically
-- Stores search results and visited pages
-- Provides context-aware AI responses
-- Per-tab context isolation
-- Visual context indicators
+### 🗣️ Community Insights
+- Pulls real discussion from **Stack Overflow, Reddit, Hacker News, and Dev.to**.
+- AI-summarized into consensus, tips, debates, and warnings — so you skip the doom-scroll.
 
-### 🖥️ Modern UI/UX
-- Tab-based browsing interface
-- Dark/Light theme support
-- Responsive design
-- Smooth animations and transitions
+### 🧠 Per-Tab Context Engine
+- Automatically tracks your **queries**, **results**, and **visited-page content** (first ~5,000 chars).
+- **Isolated per tab** — each tab is its own research thread.
+- **Visual context badge** shows what's being tracked (`🧠 Context: X searches, Y results`).
+- **One-click JSON export** of an entire session for archival or sharing.
+
+### 🖥️ Modern, Dual-Platform UI
+- **Tab-based browsing** with independent state per tab.
+- **Dark / Light themes**, persisted across sessions.
+- Smooth motion via **Framer Motion**, 3D accents via **Three.js**, and **Markdown export** of results.
+- Runs in the **browser** *or* as a native **Electron desktop app** (Windows / macOS / Linux).
+
+---
+
+## ⚙️ How It Works
+
+```
+   ┌──────────────┐   1. Search "react hooks"      ┌──────────────────────┐
+   │   You type   │ ─────────────────────────────► │  Multi-engine search │
+   │   a query    │                                │  (SerpAPI ↔ scrapers)│
+   └──────────────┘ ◄───────────────────────────── └──────────────────────┘
+          │              results returned + cached
+          │
+          ▼  2. Query + results auto-saved to this tab's context
+   ┌──────────────────────────────────────────────────────────────┐
+   │   🧠 Per-Tab Context:  queries · results · visited pages       │
+   └──────────────────────────────────────────────────────────────┘
+          │
+          ▼  3. Switch to AI mode, pick a persona, ask a follow-up
+   ┌──────────────┐    classify → (scrape if needed) → synthesize   ┌────────┐
+   │   SuperAI    │ ◄───────────────────────────────────────────── │  Groq  │
+   │  (context-   │                                                 │  LLMs  │
+   │   aware)     │ ──► "Based on your searches about react hooks…" └────────┘
+   └──────────────┘
+```
 
 ---
 
 ## 🏗️ Architecture
 
-### System Flow
+SuperBrowser is a **decoupled two-tier app**: a React/Vite frontend talks to a FastAPI backend over REST. In desktop mode, Electron bundles and supervises the Python backend locally.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend (React)                       │
-│  ┌──────────┐  ┌──────────┐  ┌─────────────────────────┐   │
-│  │   Tabs   │  │  Search  │  │   Context Manager       │   │
-│  │  Manager │  │   Bar    │  │  (useContextManager)    │   │
-│  └──────────┘  └──────────┘  └─────────────────────────┘   │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend (FastAPI)                         │
-│  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
-│  │  SuperSEO  │  │  SuperAI   │  │  Context Service     │  │
-│  │  Service   │  │  Service   │  │                      │  │
-│  └────────────┘  └────────────┘  └──────────────────────┘  │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    External APIs                             │
-│  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
-│  │  SerpAPI   │  │  GROQ API  │  │   Web Scrapers       │  │
-│  │  (Search)  │  │  (AI)      │  │                      │  │
-│  └────────────┘  └────────────┘  └──────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  FRONTEND — React 19 + Vite (web)  ·  Electron 39 (desktop)          │
+│  ┌───────────┐  ┌────────────┐  ┌─────────────────────────────────┐ │
+│  │  Tab Mgr  │  │ Search Bar │  │ useContextManager (per-tab hook)│ │
+│  └───────────┘  └────────────┘  └─────────────────────────────────┘ │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │  REST  (http://localhost:8000/api/…)
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  BACKEND — FastAPI (Uvicorn, async)                                  │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │
+│  │ /search/seo  │ │ /search/ai   │ │ /search/     │ │ /context/*  │ │
+│  │              │ │ /contextual  │ │ community    │ │ (per tab)   │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └─────────────┘ │
+│  query classifier · persona engine · summarizers · caching layer    │
+└───────────────┬───────────────────────────────────┬─────────────────┘
+                │                                     │
+                ▼                                     ▼
+        ┌───────────────┐                    ┌────────────────────┐
+        │  SerpAPI      │  ── fallback ──►    │  Web Scrapers      │
+        │  Groq LLM API │                     │  (BeautifulSoup)   │
+        └───────────────┘                    └────────────────────┘
 ```
 
-### Data Flow Diagram
-
-```
-User Query
-    │
-    ▼
-┌─────────────────┐
-│   Search Bar    │
-│   (Frontend)    │
-└────────┬────────┘
-         │
-         ▼
-    ┌────────┐
-    │  Mode? │
-    └───┬────┘
-        │
-    ┌───┴───┐
-    │       │
-    ▼       ▼
-┌──────┐ ┌──────┐
-│ SEO  │ │  AI  │
-└───┬──┘ └──┬───┘
-    │       │
-    ▼       ▼
-┌────────┐ ┌─────────────┐
-│SerpAPI/│ │Context +    │
-│Scraper │ │GROQ API     │
-└───┬────┘ └──┬──────────┘
-    │         │
-    ▼         ▼
-┌────────────────────┐
-│   Store Context    │
-│  (Per Tab/Session) │
-└────────────────────┘
-```
-
-### Context Tracking Flow
-
-```
-1. User searches "react hooks" (SEO mode)
-   └─> Query stored in context
-   └─> Results stored in context
-
-2. User searches "useEffect" (SEO mode)
-   └─> Query added to context
-   └─> Results added to context
-
-3. User switches to AI mode
-   └─> Asks: "How do I use these together?"
-   └─> AI receives full context
-   └─> Response: "Based on your searches about react hooks and useEffect..."
-```
+> **Note:** Context is held **in memory** on the backend (no database), scoped per `session_id` → `tab_id`, with a 1-hour idle TTL. It persists for the life of the server process and can be exported to JSON at any time.
 
 ---
 
-## 🛠️ Installation
+## 🧰 Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 19, Vite, TailwindCSS, Framer Motion, Three.js / React Three Fiber, Recharts |
+| **Desktop** | Electron 39, electron-builder (NSIS · DMG · AppImage) |
+| **Backend** | Python 3.8+, FastAPI, Uvicorn, httpx, BeautifulSoup4, cachetools |
+| **AI & Search** | Groq (Llama 3.1/3.3, Mixtral, Gemma), SerpAPI, custom scrapers |
+| **Hosting / CI** | Firebase Hosting, GitHub Actions |
+
+---
+
+## 🛠️ Getting Started
 
 ### Prerequisites
-- **Node.js** (v16 or higher)
-- **Python** (v3.8 or higher)
-- **pip** (Python package manager)
-- **npm** or **yarn**
 
-### Backend Setup
+- **Node.js** ≥ 16 and **npm**
+- **Python** ≥ 3.8 and **pip**
+- API keys for [**SerpAPI**](https://serpapi.com) and [**Groq**](https://console.groq.com) (see [Configuration](#-configuration))
+
+### 1. Clone the repo
 
 ```bash
-cd backend/
+git clone https://github.com/PandyaJeet/SuperBrowser.git
+cd SuperBrowser
+```
+
+### 2. Start the backend
+
+```bash
+cd backend
 pip install -r requirements.txt
+
+# create your .env (see Configuration below), then run:
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Kill port (if needed):**
-```bash
-lsof -ti:8000 | xargs kill -9
-```
+The API will be available at **http://localhost:8000**, with interactive docs at **http://localhost:8000/docs**.
 
-### Frontend Setup
+> **Port already in use?** `lsof -ti:8000 | xargs kill -9`
+
+### 3. Start the frontend
+
+In a second terminal:
 
 ```bash
-cd frontend/
+cd frontend
 npm install
 npm run dev -- --host 0.0.0.0
 ```
 
+Open **http://localhost:5173** in your browser. The frontend auto-detects its API base (local, Codespaces, or Electron), so no extra config is needed for local dev.
+
 ---
 
-## ⚙️ Configuration
+## 🔐 Configuration
 
-### Environment Variables
-
-Create a `.env` file inside `backend/` directory:
+Create a `.env` file inside the **`backend/`** directory:
 
 ```env
+# Required — powers SuperSEO search across Google, Bing & DuckDuckGo
 SERPAPI_API_KEY=your_serpapi_key
+
+# Required — powers all SuperAI responses & summaries
 GROQ_API_KEY=your_groq_key
+
+# Optional — CORS allow-list (comma-separated). Defaults to http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-#### API Keys
+| Variable | Required | Purpose | Get a key |
+|---|:---:|---|---|
+| `SERPAPI_API_KEY` *(or `SERP_API_KEY`)* | ✅ | Live search results for SuperSEO | [serpapi.com](https://serpapi.com) |
+| `GROQ_API_KEY` | ✅ | LLM inference for SuperAI & summaries | [console.groq.com](https://console.groq.com) |
+| `ALLOWED_ORIGINS` | ⬜ | CORS origins for the backend | — |
 
-**SERPAPI_API_KEY** (or `SERP_API_KEY`)
-- Powers SuperSEO search for:
-  - Google
-  - Bing
-  - DuckDuckGo
-- Get your key at: [serpapi.com](https://serpapi.com)
+**Frontend overrides** (optional, via Vite env): `VITE_API_BASE` and `VITE_API_BASE_ELECTRON` let you point the UI at a custom backend URL.
 
-**GROQ_API_KEY**
-- Powers SuperAI responses
-- Get your key at: [console.groq.com](https://console.groq.com)
-
-> **Note**: If any SerpAPI engine fails or returns no results, SuperSEO automatically falls back to the matching web scraper.
+> If any SerpAPI engine fails or returns nothing, SuperSEO automatically falls back to the matching web scraper — so search keeps working even without a perfect API response.
 
 ---
 
-## 💡 Usage
+## 🖥️ Running the Desktop App
 
-### Basic Search (SEO Mode)
-1. Select **SuperSEO** mode
-2. Choose search engine (Google/Bing/DuckDuckGo)
-3. Enter your query
-4. Browse results
+SuperBrowser can run as a native Electron app that **spawns and supervises the Python backend for you**.
 
-### AI Interaction (AI Mode)
-1. Select **SuperAI** mode
-2. Choose AI persona (ChatGPT/Claude/Gemini)
-3. Ask your question
-4. AI responds with context awareness
+```bash
+cd frontend
 
-### Context-Aware Features
-- Context is tracked automatically per tab
-- Switch between tabs to maintain separate contexts
-- View context badge to see tracked information
-- AI uses your browsing history for better responses
+# Dev: runs Vite + Electron together with hot reload
+npm run dev:electron
+
+# Build distributables
+npm run dist:win     # Windows  → NSIS installer
+npm run dist:mac     # macOS    → .dmg
+npm run dist:linux   # Linux    → .AppImage
+```
+
+In desktop mode the app talks to the backend over `http://127.0.0.1:8000` and cleanly terminates the backend process on exit. A single-instance lock prevents duplicate windows.
 
 ---
 
-## 📚 API Documentation
+## 📚 API Reference
 
-### SuperSEO Endpoints
+All routes are served under **`http://localhost:8000`**. Full interactive docs (Swagger UI) live at **`/docs`**.
 
-#### Search
-```http
-POST /api/search/seo
-Content-Type: application/json
+### Search
 
-{
-  "query": "react hooks",
-  "engine": "google",
-  "num_results": 10
-}
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/search/seo?q={query}` | Multi-engine search with scraper fallback. |
+| `GET` | `/api/search/ai?q={query}&persona={p}&gl={region}` | AI answer (persona-styled, region-aware). |
+| `POST` | `/api/search/ai/contextual` | AI answer using full browsing context *(body below)*. |
+| `GET` | `/api/search/community?q={query}` | Summarized insights from SO, Reddit, HN, Dev.to. |
 
-### SuperAI Endpoints
+<details>
+<summary><b>Example — contextual AI request</b></summary>
 
-#### AI Query with Context
 ```http
 POST /api/search/ai/contextual
 Content-Type: application/json
 
 {
-  "query": "How do I use React hooks?",
-  "persona": "chatgpt",
+  "query": "How do I use these together?",
+  "persona": "perplexity",
   "context": {
     "queries": ["react hooks", "useEffect"],
-    "results": [...],
-    "visited_pages": [...]
+    "results": [ { "title": "...", "url": "...", "snippet": "..." } ],
+    "visited_pages": [ { "url": "...", "content": "..." } ]
   }
 }
 ```
 
-### Context Management Endpoints
+`persona` is one of: `default` · `chatgpt` · `gemini` · `perplexity` · `claude`.
+</details>
 
-#### Add Query to Context
-```http
-POST /api/context/add_query
-{
-  "session_id": "uuid",
-  "tab_id": "uuid",
-  "query": "react hooks",
-  "mode": "seo"
-}
-```
+### Context Management
 
-#### Get Tab Context
-```http
-GET /api/context/get/{session_id}/{tab_id}
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/context/session/start` | Start a browsing session. |
+| `POST` | `/api/context/add_query` | Add a query to a tab's context. |
+| `POST` | `/api/context/add_results` | Add search results to a tab's context. |
+| `POST` | `/api/context/add_visited_page` | Add visited-page content to context. |
+| `GET` | `/api/context/get/{session_id}/{tab_id}` | Fetch a tab's context. |
+| `GET` | `/api/context/export/{session_id}` | Export the full session context as JSON. |
+| `POST` | `/api/context/chat` | Chat with the AI about your browsing context. |
+| `DELETE` | `/api/context/clear/{session_id}/{tab_id}` | Clear one tab's context. |
 
-#### Clear Context
-```http
-DELETE /api/context/clear/{session_id}/{tab_id}
-```
-
-For more detailed API documentation, see [CONTEXT_FEATURE.md](./CONTEXT_FEATURE.md) and [TESTING.md](./TESTING.md).
+For deeper detail see [CONTEXT_FEATURE.md](./CONTEXT_FEATURE.md) and [TESTING.md](./TESTING.md).
 
 ---
 
-## 🧪 Testing
+## 📂 Project Structure
 
-See [TESTING.md](./TESTING.md) for comprehensive testing guidelines.
+```
+SuperBrowser/
+├── backend/                 # FastAPI app
+│   ├── main.py              # App entry point & router mounting
+│   ├── routers/             # seo · ai · community · context endpoints
+│   ├── services/            # groq, super_ai, query_classifier, personas, summarizers
+│   ├── scrapers/            # Google/Bing/DDG + SO/Reddit/HN/Dev.to scrapers
+│   ├── utils/               # caching helpers
+│   └── requirements.txt
+├── frontend/                # React + Vite + Electron
+│   ├── src/
+│   │   ├── App.jsx          # App shell, tabs, search dispatch
+│   │   ├── components/      # AiInput, CommunityResults, ProductCarousel, …
+│   │   ├── config/apiBase.js# API base resolution (web/Codespaces/Electron)
+│   │   └── useContextManager.js
+│   └── electron/            # main.cjs, preload.cjs (desktop runtime)
+├── systemprompt/            # Persona system prompts (perplexity, sonnet, …)
+└── .github/workflows/       # CI: star-check, auto-label
+```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md)
-before starting work so your setup, issue claim, branch name, and PR format
-match the project expectations.
+Contributions are welcome! Please read **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, issue-claim, branch-naming, and PR conventions, and review our **[Code of Conduct](./CODE_OF_CONDUCT.md)**.
 
-For GSSoC contributions, comment with your proposed approach on the issue and
-wait for assignment before coding. The contributor guide covers backend and
-frontend setup, required `.env` keys, branch naming, PR descriptions, GSSoC
-labels, and code style.
+For **GSSoC** contributions, comment your proposed approach on an issue and wait for assignment before coding.
+
+> ⭐ **Please star this repository before submitting a pull request.** Starring is required for your PR to be merged. A `star-check` workflow reports whether the PR author has starred the repo, and maintainers will not merge unstarred contributions.
 
 ---
-## ⚖️Code of Conduct
-This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md).
-
-
 
 ## 📄 License
 
-This project is open source and available under the MIT License.
+Released under the **[MIT License](./LICENSE)**.
 
 ---
 
-## 🔗 Links
+## 👨‍💻 Authors
 
-- **Live Demo**: [https://superbrowser-d6441.web.app/](https://superbrowser-d6441.web.app/)
-- **Download Desktop App**: Available on the [live website](https://superbrowser-d6441.web.app/)
-- **Repository**: [GitHub](https://github.com/PandyaJeet/SuperBrowser)
-
----
-
-## 👨‍💻 Author
-
-**Jeet Pandya**
-- GitHub: [@PandyaJeet](https://github.com/PandyaJeet)
-
-**Prince Patel**
-- Github: [@Princepatel-027](https://github.com/Princepatel-027).
----
+| | |
+|---|---|
+| **Jeet Pandya** | [@PandyaJeet](https://github.com/PandyaJeet) |
+| **Prince Patel** | [@Princepatel-027](https://github.com/Princepatel-027) |
 
 <div align="center">
-  <p>Made with ❤️ using React, FastAPI, and AI</p>
-  <p>⭐ Star this repo if you find it useful!</p>
+<br/>
+<sub>Built using React, FastAPI, and AI.</sub>
+<br/>
+<b>⭐ If SuperBrowser helps you, give it a star!</b>
 </div>

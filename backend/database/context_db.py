@@ -1,27 +1,4 @@
-import os
-from pathlib import Path
-
-# Get backend directory
-backend_dir = Path(__file__).parent
-
-# Create database directory
-db_dir = backend_dir / "database"
-db_dir.mkdir(exist_ok=True)
-
-# Create data directory  
-data_dir = backend_dir / "data"
-data_dir.mkdir(exist_ok=True)
-
-print(f"[+] Created: {db_dir}")
-print(f"[+] Created: {data_dir}")
-
-# Create __init__.py for database module
-init_file = db_dir / "__init__.py"
-init_file.write_text('from .context_db import ContextDatabase, get_context_db\n\n__all__ = ["ContextDatabase", "get_context_db"]\n')
-print(f"[+] Created: {init_file}")
-
-# Create context_db.py
-context_db_content = '''"""
+"""
 Context Database Manager - Handles persistent storage of browsing history and context
 """
 import sqlite3
@@ -390,10 +367,3 @@ def get_context_db() -> ContextDatabase:
     if _db_instance is None:
         _db_instance = ContextDatabase()
     return _db_instance
-'''
-
-context_db_file = db_dir / "context_db.py"
-context_db_file.write_text(context_db_content)
-print(f"[+] Created: {context_db_file}")
-
-print("\n[+] All database files created successfully!")

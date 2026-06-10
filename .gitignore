@@ -46,3 +46,8 @@ frontend/release/
 backend/superbrowser-backend.exe
 backend/.pyi-build/
 backend/*.spec
+
+# Databases
+*.db
+backend/data/*.db
+

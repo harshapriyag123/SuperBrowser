@@ -1,0 +1,68 @@
+name: star-check
+
+# Verification only: checks whether the PR author has starred the repository
+# and reports it as a passing/failing status on the PR. It does NOT close or
+# block the PR — maintainers use the result to decide whether to merge.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  star-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR author has starred the repo
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+
+            // Repo owner, members, and collaborators are exempt.
+            if (author === owner || ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association)) {
+              console.log(`Author "${author}" is exempt (${pr.author_association}).`);
+              return;
+            }
+
+            const stargazers = await github.paginate(
+              github.rest.activity.listStargazersForRepo,
+              { owner, repo, per_page: 100 }
+            );
+            const hasStarred = stargazers.some(u => u.login.toLowerCase() === author.toLowerCase());
+
+            if (hasStarred) {
+              console.log(`Author "${author}" has starred the repo. star-check passed.`);
+              return;
+            }
+
+            // Not starred: post a one-time reminder comment, then fail the check.
+            const marker = '<!-- star-check-reminder -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+            const alreadyCommented = comments.some(c => c.body && c.body.includes(marker));
+
+            if (!alreadyCommented) {
+              const body = [
+                marker,
+                `Hi @${author}, thanks for your contribution! :star:`,
+                ``,
+                `This repository requires contributors to **star the repository** before a`,
+                `pull request can be merged.`,
+                ``,
+                `Please star the repo: https://github.com/${owner}/${repo}`,
+                ``,
+                `Once you've starred it, push any commit (or reopen the PR) to re-run this`,
+                `check and it will turn green. Thank you! :tada:`,
+              ].join('\n');
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+            }
+
+            core.setFailed(`star-check failed: author "${author}" has not starred the repository.`);

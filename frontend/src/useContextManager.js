@@ -26,6 +26,9 @@ export function useContextManager() {
 
   const startSession = useCallback(async (sessionId) => {
     if (!sessionId) return null
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.startSession) {
+      return window.superBrowserDesktop.context.startSession(sessionId)
+    }
     const res = await fetch(`${API_BASE}/api/context/session/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -38,6 +41,9 @@ export function useContextManager() {
   const stopSession = useCallback(async (sessionId, options = {}) => {
     if (!sessionId) return null
     const { keepalive = false } = options
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.stopSession) {
+      return window.superBrowserDesktop.context.stopSession(sessionId, { keepalive })
+    }
     const res = await fetch(`${API_BASE}/api/context/session/stop/${sessionId}`, {
       method: 'POST',
       keepalive
@@ -59,6 +65,10 @@ export function useContextManager() {
     }
 
     // Send to backend (fire and forget)
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.addQuery) {
+      window.superBrowserDesktop.context.addQuery(sessionId, tabId, query, mode).catch(() => {});
+      return;
+    }
     fetch(`${API_BASE}/api/context/add_query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,6 +93,10 @@ export function useContextManager() {
     context.results = resultsData;
 
     // Send to backend
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.addResults) {
+      window.superBrowserDesktop.context.addResults(sessionId, tabId, resultsData).catch(() => {});
+      return;
+    }
     fetch(`${API_BASE}/api/context/add_results`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -115,6 +129,10 @@ export function useContextManager() {
     }
 
     // Send to backend
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.addVisitedPage) {
+      window.superBrowserDesktop.context.addVisitedPage(sessionId, tabId, page).catch(() => {});
+      return;
+    }
     fetch(`${API_BASE}/api/context/add_visited_page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -186,10 +204,14 @@ export function useContextManager() {
   }, [])
 
   const downloadSessionContext = useCallback(async (sessionId) => {
-    const res = await fetch(`${API_BASE}/api/context/export/${sessionId}`)
-    if (!res.ok) throw new Error(`Failed to export session context: ${res.status}`)
-
-    const data = await res.json()
+    let data;
+    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.exportSession) {
+      data = await window.superBrowserDesktop.context.exportSession(sessionId);
+    } else {
+      const res = await fetch(`${API_BASE}/api/context/export/${sessionId}`);
+      if (!res.ok) throw new Error(`Failed to export session context: ${res.status}`);
+      data = await res.json();
+    }
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const safeSession = (sessionId || 'session').slice(0, 8)
     const filename = `superbrowser-context-${safeSession}-${timestamp}.json`
