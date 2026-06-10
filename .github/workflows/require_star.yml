@@ -1,0 +1,77 @@
+name: Require star before contributing
+
+# Contributors must star the repository before their PR is accepted.
+# Note: GitHub does not allow blocking forks, so this gates at the pull request
+# stage. If the PR author has not starred the repo, the PR is commented on and
+# closed until they star and reopen.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-star:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR author has starred the repo
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+
+            // Repo owner and members are exempt.
+            if (author === owner || pr.author_association === 'OWNER' ||
+                pr.author_association === 'MEMBER' || pr.author_association === 'COLLABORATOR') {
+              console.log(`Author "${author}" is exempt (${pr.author_association}).`);
+              return;
+            }
+
+            // Paginate through all stargazers and check membership.
+            const stargazers = await github.paginate(
+              github.rest.activity.listStargazersForRepo,
+              { owner, repo, per_page: 100 }
+            );
+            const hasStarred = stargazers.some(u => u.login.toLowerCase() === author.toLowerCase());
+
+            if (hasStarred) {
+              console.log(`Author "${author}" has starred the repo. PR allowed.`);
+              return;
+            }
+
+            console.log(`Author "${author}" has NOT starred the repo. Closing PR.`);
+
+            const body = [
+              `Hi @${author}, thanks for your contribution! :star:`,
+              ``,
+              `This repository requires contributors to **star the repository** before their`,
+              `pull request can be reviewed and merged.`,
+              ``,
+              `Please:`,
+              `1. Star this repo: https://github.com/${owner}/${repo}`,
+              `2. **Reopen** this pull request (or open a new one).`,
+              ``,
+              `Once you've starred the repo, your reopened PR will pass this check. Thank you! :tada:`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr.number,
+              body,
+            });
+
+            await github.rest.pulls.update({
+              owner,
+              repo,
+              pull_number: pr.number,
+              state: 'closed',
+            });
+
+            core.setFailed(`PR closed: author "${author}" has not starred the repository.`);
