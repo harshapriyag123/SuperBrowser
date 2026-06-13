@@ -18,7 +18,9 @@ export function ThemeToggle() {
       title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       type="button"
     >
-      {isDark ? '☀️' : '🌙'}
+      {isDark ? '☀️' : '🌙'} 
+
+      
     </button>
   );
 }
