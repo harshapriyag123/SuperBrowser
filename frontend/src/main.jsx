@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 
 const THEME_STORAGE_KEY = 'superbrowser-theme'
@@ -19,9 +20,11 @@ function resolveInitialTheme() {
 document.documentElement.dataset.theme = resolveInitialTheme()
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+ <StrictMode>
     <ErrorBoundary>
-      <App />
++     <ThemeProvider>
+        <App />
++     </ThemeProvider>
     </ErrorBoundary>
-  </StrictMode>,
+  </StrictMode>
 )

@@ -17,6 +17,36 @@ const PERSONAS = [
 ]
 
 const API_BASE = getApiBase()
+const THEME_STORAGE_KEY = 'super-browser-theme'
+
+function getInitialTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'dark' || stored === 'light') return stored
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  } catch { return 'dark' }
+}
+
+// Icons
+const SunIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"/>
+    <line x1="12" y1="1" x2="12" y2="3"/>
+    <line x1="12" y1="21" x2="12" y2="23"/>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+    <line x1="1" y1="12" x2="3" y2="12"/>
+    <line x1="21" y1="12" x2="23" y2="12"/>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+  </svg>
+)
+
+const MoonIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+)
 
 function createNewTab(sessionId = null) {
   return {
@@ -63,6 +93,7 @@ const HomeIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="non
 const ChevronDownIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
 
 export default function App() {
+  const [theme, setTheme] = useState(getInitialTheme)
   const [appSessionId] = useState(() => crypto.randomUUID())
   const [sessionStartedAt] = useState(() => new Date().toISOString())
   const [sessionStatus, setSessionStatus] = useState("starting")
@@ -93,14 +124,25 @@ export default function App() {
   const searchControllersRef = useRef({})
   const contextManager = useContextManager()
   const activeTab = tabs.find(t => t.id === activeTabId)
-  
+
   const isBrowserTab = Boolean(activeTab?.browserUrl)
   const isNewTab = !activeTab?.results && !activeTab?.loading && !activeTab?.error && !isBrowserTab
+
+  const toggleTheme = useCallback(() => {
+    setTheme(current => current === 'dark' ? 'light' : 'dark')
+  }, [])
 
   useEffect(() => {
     if (!window.superBrowserDesktop?.isElectron || !window.superBrowserDesktop?.backend?.getStatus) return
     window.superBrowserDesktop.backend.getStatus().then(setBackendStatus).catch(() => {})
   }, [])
+  
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {}
+  }, [theme])
 
   useEffect(() => {
     contextManager.startSession(appSessionId)
@@ -112,7 +154,7 @@ export default function App() {
     }
     window.addEventListener("beforeunload", stopSession)
     return () => { window.removeEventListener("beforeunload", stopSession); stopSession() }
-  }, [appSessionId, contextManager.startSession, contextManager.stopSession])
+  }, [appSessionId, contextManager])
 
   const updateTab = useCallback((tabId, updates) => {
     setTabs(prev => prev.map(t => t.id === tabId ? { ...t, ...updates } : t))
@@ -146,7 +188,7 @@ export default function App() {
     let url = `${API_BASE}${endpoints[tabData.activeMode]}?q=${encodeURIComponent(tabData.query)}&session_id=${tabData.sessionId}&gl=${userRegion}`
     if (tabData.activeMode === 'ai') url += `&persona=${searchPersona}`
     fetch(url, { signal: controller.signal }).then(r => r.json()).then(onSuccess).catch(onError).finally(onDone)
-  }, [contextManager])
+  }, [contextManager, userRegion])
 
   const handleSearch = useCallback((tabId, searchPersona = "default") => {
     setTabs(currentTabs => {
@@ -269,7 +311,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [appSessionId, handleModeChange, updateTab])
+  }, [appSessionId, handleModeChange, updateTab, handleAddTab, handleCloseTab])
 
   function handleHistoryClick(item) { 
     updateTab(activeTabId, { query: item.query, activeMode: item.mode })
@@ -293,7 +335,7 @@ export default function App() {
         <LazyBackgroundOrb isVisible={isNewTab} />
       </Suspense>
 
-      {/* Hand-drawn style Tab Bar */}
+      {/* Hand-drawn style TabBar with theme toggle */}
       <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
@@ -302,6 +344,8 @@ export default function App() {
         onAddTab={() => { setShowPricing(false); handleAddTab() }}
         onShowHistory={() => { setShowPricing(false); setShowHistory(true) }}
         onOpenPricing={() => { setShowHistory(false); setShowPricing(true) }}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Content */}
@@ -452,8 +496,10 @@ export default function App() {
 
 /* ── UI Components ── */
 
-function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHistory, onOpenPricing }) {
+function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHistory, onOpenPricing, theme, onToggleTheme }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const nextTheme = theme === 'dark' ? 'light' : 'dark'
+  
   return (
     <div className="flex border-b border-[var(--border-color)] w-full bg-white select-none" style={{ height: '44px' }}>
       <div className="flex-1 flex overflow-x-auto scrollbar-hide h-full">
@@ -478,6 +524,20 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
           BROWSER MENU
         </button>
         {isMenuOpen && <BrowserMenu onClose={() => setIsMenuOpen(false)} onAddTab={onAddTab} onShowHistory={onShowHistory} onOpenPricing={onOpenPricing} />}
+        
+        {/* Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="theme-toggle w-12 h-full flex items-center justify-center transition-colors"
+          aria-label={`Switch to ${nextTheme} mode`}
+          aria-pressed={theme === 'dark'}
+          title={`Switch to ${nextTheme} mode`}
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </button>
+        
+        {/* Pricing Button */}
         <button
           onClick={() => { setIsMenuOpen(false); onOpenPricing() }}
           className="px-4 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border-l border-[var(--border-color)]"
@@ -485,6 +545,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
         >
           PRICING
         </button>
+        
+        {/* Window Controls */}
         <div className="flex h-full pl-1 border-l border-[var(--border-color)]">
           <button onClick={() => window.superBrowserDesktop?.minimize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Minimize"><MinusIcon /></button>
           <button onClick={() => window.superBrowserDesktop?.maximize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Maximize"><SquareIcon /></button>
