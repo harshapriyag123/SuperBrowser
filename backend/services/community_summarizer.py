@@ -1,5 +1,6 @@
 import asyncio
 import os
+import logging
 
 import httpx
 
@@ -7,6 +8,8 @@ from scrapers.stackexchange import scrape_stackexchange
 from scrapers.reddit import scrape_reddit
 from scrapers.hackernews import scrape_hackernews
 from scrapers.devto import scrape_devto
+
+logger = logging.getLogger(__name__)
 
 
 async def get_community_insights(query: str) -> dict:
@@ -144,5 +147,6 @@ async def _call_ai_for_insights(prompt: str) -> str:
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
 
-    except Exception as e:
-        return f"AI summarization failed: {str(e)}"
+    except Exception:
+        logger.exception("AI summarization request failed")
+        return "AI summarization unavailable at the moment."
