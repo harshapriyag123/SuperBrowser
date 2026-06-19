@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from services.groq_service import ask_groq
 from database import get_context_db
+from services.personas import get_persona
 
 VALID_TOKEN = os.environ.get("SUPERBROWSER_SESSION_TOKEN", secrets.token_urlsafe(32))
 
@@ -536,7 +537,7 @@ async def chat_with_context(
     session_id: str = Body(...),
     message: str = Body(...),
     tab_id: Optional[str] = Body(None),
-    model: str = Body("llama-3.1-8b-instant"),
+    model: str = Body("default"),
     app_session_id: Optional[str] = Body(None),
 ):
     db = get_context_db()
@@ -552,6 +553,12 @@ async def chat_with_context(
         groq_messages.append({"role": msg["role"], "content": content})
     context_session_id = app_session_id or session_id
     context_summary = _build_context_summary(context_session_id)
+
+    persona_config = get_persona(model)
+    actual_model = persona_config.get("model") or "llama-3.1-8b-instant"
+    persona_prompt = persona_config.get("system_prompt")
+
+    # System prompt with context
     system_prompt = f"""You are Super AI, an intelligent assistant for the SuperBrowser application.
 You help users understand and analyze their browsing context - the searches they've made, 
 the results they've found, and the pages they've visited.
@@ -565,7 +572,14 @@ Guidelines:
 - If the user asks about something not in the context, acknowledge that
 - You can suggest related searches or help analyze patterns in their browsing
 - Keep responses focused and under 200 words unless the user asks for more detail"""
-    response = await ask_groq(model=model, system_prompt=system_prompt, messages=groq_messages)
+
+    if persona_prompt:
+        system_prompt += f"\n\nAdditional instructions for your personality:\n{persona_prompt}"
+
+    # Call Groq API with selected model and message history
+    response = await ask_groq(model=actual_model, system_prompt=system_prompt, messages=groq_messages)
+
+    # Save assistant response to persistent DB
     assistant_msg_id = f"msg_{datetime.now().timestamp()}_{uuid.uuid4().hex[:6]}"
     db.save_chat_message(assistant_msg_id, session_id, "assistant", response, model)
     return {
@@ -577,11 +591,36 @@ Guidelines:
 
 
 AVAILABLE_MODELS = [
-    {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "description": "Most capable, best for complex analysis", "provider": "Meta"},
-    {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B", "description": "Fast and efficient for quick responses", "provider": "Meta"},
-    {"id": "mixtral-8x7b-32768", "name": "Mixtral 8x7B", "description": "Balanced performance with large context", "provider": "Mistral"},
-    {"id": "gemma2-9b-it", "name": "Gemma 2 9B", "description": "Google's efficient instruction-tuned model", "provider": "Google"},
-    {"id": "llama-3.1-70b-versatile", "name": "Llama 3.1 70B", "description": "Large model for detailed responses", "provider": "Meta"},
+    {
+        "id": "default",
+        "name": "Llama 3.1 8B (Default)",
+        "description": "Raw Groq - no persona",
+        "provider": "Meta"
+    },
+    {
+        "id": "chatgpt",
+        "name": "ChatGPT (GPT-4o)",
+        "description": "Helpful, concise, friendly & practical",
+        "provider": "OpenAI"
+    },
+    {
+        "id": "gemini",
+        "name": "Gemini 1.5 Pro",
+        "description": "Analytical & connect ideas broadly",
+        "provider": "Google"
+    },
+    {
+        "id": "claude",
+        "name": "Claude 3.5 Sonnet",
+        "description": "Nuanced, careful & detailed analysis",
+        "provider": "Anthropic"
+    },
+    {
+        "id": "perplexity",
+        "name": "Perplexity AI",
+        "description": "Factual, search-style & cited",
+        "provider": "Perplexity"
+    },
 ]
 
 
@@ -595,7 +634,7 @@ async def get_available_models():
     return {
         "status": "success",
         "models": AVAILABLE_MODELS,
-        "default": "llama-3.1-8b-instant"
+        "default": "default"
     }
 
 

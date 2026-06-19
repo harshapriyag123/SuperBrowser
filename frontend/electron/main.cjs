@@ -619,3 +619,28 @@ app.on("before-quit", () => {
   logEvent("info", "App shutting down");
   stopBackend();
 });
+
+// SEC-02: Enforce scheme policy for all webview content at the process level
+app.on('web-contents-created', (_, contents) => {
+  if (contents.getType() === 'webview') {
+    // Block non-http(s) navigations at the Electron process level
+    contents.on('will-navigate', (event, navigationUrl) => {
+      try {
+        const parsed = new URL(navigationUrl)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          console.warn('[SuperBrowser][main] Blocked webview navigation:', parsed.protocol, navigationUrl)
+          event.preventDefault()
+        }
+      } catch {
+        console.warn('[SuperBrowser][main] Blocked malformed webview navigation URL:', navigationUrl)
+        event.preventDefault()
+      }
+    })
+
+    // Block all popup windows spawned by webview content
+    contents.setWindowOpenHandler(({ url }) => {
+      console.warn('[SuperBrowser][main] Blocked popup window to:', url)
+      return { action: 'deny' }
+    })
+  }
+})
