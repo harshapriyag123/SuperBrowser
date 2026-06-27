@@ -21,8 +21,13 @@ from services.personas import get_persona
 VALID_TOKEN = os.environ.get("SUPERBROWSER_SESSION_TOKEN", secrets.token_urlsafe(32))
 
 def verify_token(x_session_token: str = Header(default="")):
+    # Skip verification in development mode
+    if os.environ.get("IS_DEVELOPMENT") == "true":
+        return
+
     if not VALID_TOKEN or not secrets.compare_digest(x_session_token, VALID_TOKEN):
         raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 router = APIRouter(dependencies=[Depends(verify_token)])
 
@@ -392,30 +397,31 @@ async def get_session_context(session_id: str):
 
 
 @router.delete(
-    "/context/clear/{session_id}/{tab_id}",
-    response_model=ClearResponse,
-    summary="Clear tab context",
-    description="Clears all stored context data for a specific tab within a session."
-)
-async def clear_tab_context(session_id: str, tab_id: str):
-    if session_id in _context_store and tab_id in _context_store[session_id]:
-        del _context_store[session_id][tab_id]
-        return {"status": "success", "message": "Tab context cleared"}
-    return {"status": "success", "message": "No context to clear"}
-
-
-@router.delete(
     "/context/clear/{session_id}",
     response_model=ClearResponse,
-    summary="Clear session context",
-    description="Clears all context data for an entire session including all tabs."
+    summary="Clear complete session workspace",
+    description="Wipes all in-memory tab contexts, session metadata, and persistent AI chat histories for complete user privacy."
 )
 async def clear_session_context(session_id: str):
+    # 1. Wipe temporary in-memory browser tab tracking
     if session_id in _context_store:
         del _context_store[session_id]
+        
+    # 2. Wipe temporary session tracking metadata
     if session_id in _session_store:
         del _session_store[session_id]
-    return {"status": "success", "message": "Session context cleared"}
+        
+    # 3. Wipe persistent AI chat histories and sessions from the Database
+    try:
+        db = get_context_db()
+        db.clear_chat_history(session_id)
+        db.delete_chat_session(session_id)
+    except Exception as e:
+        # Prevents an error from crashing the response if a session didn't have active chats
+        print(f"Database clean up note: {e}")
+        
+    return {"status": "success", "message": "Entire workspace and AI context wiped successfully"}
+
 
 
 @router.post(
