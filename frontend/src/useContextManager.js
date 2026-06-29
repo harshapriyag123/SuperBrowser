@@ -2,7 +2,7 @@
  * Context Manager Hook
  * Manages browsing context for each tab - tracks queries, results, and visited pages
  */
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { getApiBase } from './config/apiBase'
 
 const API_BASE = getApiBase()
@@ -240,7 +240,7 @@ export function useContextManager() {
     };
   }, [getContext]);
 
-  return {
+  return useMemo(() => ({
     startSession,
     stopSession,
     initializeTab,
@@ -254,5 +254,19 @@ export function useContextManager() {
     fetchTabContext,
     fetchSessionContext,
     downloadSessionContext
-  };
+  }), [
+    startSession,
+    stopSession,
+    initializeTab,
+    addQuery,
+    addResults,
+    addVisitedPage,
+    getContext,
+    getAIContext,
+    clearTabContext,
+    getContextSummary,
+    fetchTabContext,
+    fetchSessionContext,
+    downloadSessionContext
+  ]);
 }
