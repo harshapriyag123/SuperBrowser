@@ -1,13 +1,15 @@
-import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react'
-import { useContextManager } from './useContextManager'
-import { getApiBase } from './config/apiBase'
+// Static imports 
+import React, { useState, useEffect, lazy, Suspense, useRef, useCallback, useMemo } from 'react';
+import { clearEntireSessionWorkspace } from './useContextManager';
+import { Trash2 } from 'lucide-react'; 
+import { useContextManager } from './useContextManager';
+import { getApiBase } from './config/apiBase';
+import { ContinuousPaginationDemo } from './components/ContinuousPagination';
+import { AiInput } from './components/AiInput';
+import { ProductCarousel } from './components/ProductCarousel';
 
-const LazyCommunityResults = lazy(() => import('./components/CommunityResults'))
-const LazyBackgroundOrb = lazy(() => import('./components/BackgroundOrb'))
-import { ContinuousPaginationDemo } from './components/ContinuousPagination'
-import { AiInput } from './components/AiInput'
-import { ProductCarousel } from './components/ProductCarousel'
-
+const LazyCommunityResults = lazy(() => import('./components/CommunityResults'));
+const LazyBackgroundOrb = lazy(() => import('./components/BackgroundOrb'));
 const PERSONAS = [
   { id: "default", label: "Default", desc: "Raw Groq" },
   { id: "chatgpt", label: "ChatGPT", desc: "Concise & practical" },
@@ -64,7 +66,6 @@ function createNewTab(sessionId = null) {
     showChat: false,
     selectedModel: "default",
     lastQuery: ""
-
   }
 }
 
@@ -106,16 +107,11 @@ export default function App() {
     return { tabs: [initialTab], activeId: initialTab.id }
   })
 
-  const searchInputHomeRef = useRef(null)
-  const searchInputHeaderRef = useRef(null)
-
   const [tabs, setTabs] = useState(tabsState.tabs)
   const [activeTabId, setActiveTabId] = useState(tabsState.activeId)
   const [showHistory, setShowHistory] = useState(false)
   const [showPricing, setShowPricing] = useState(false)
-  const [theme, setTheme] = useState(getInitialTheme)
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
-
   const [showContextInfo, setShowContextInfo] = useState(false)
   const [backendStatus, setBackendStatus] = useState(null)
   const [userRegion] = useState(() => {
@@ -132,6 +128,37 @@ export default function App() {
 
   const isBrowserTab = Boolean(activeTab?.browserUrl)
   const isNewTab = !activeTab?.results && !activeTab?.loading && !activeTab?.error && !isBrowserTab
+
+  // --- UPDATED WIPE WORKSPACE HANDLER ---
+  // Place this code safely inside the main export default function App() { ... }
+  const handleGlobalWorkspaceWipe = async () => {
+    const confirmWipe = window.confirm(
+      "Are you sure you want to permanently clear all tabs, browsing history, and AI contexts? This cannot be undone."
+    );
+    
+    if (!confirmWipe) return;
+
+    // Use the active tracking session variable
+    const activeSessionId = appSessionId || "default-session";
+
+    try {
+      // 1. Fire delete request to backend database
+      await clearEntireSessionWorkspace(activeSessionId);
+    } catch (err) {
+      console.warn("Backend clear failed, clearing local state anyway", err);
+    }
+    
+    // 2. Clear frontend state completely
+    const freshTab = createNewTab(activeSessionId);
+    setTabs([freshTab]);
+    setActiveTabId(freshTab.id);
+    setShowHistory(false);
+    
+    alert("Workspace successfully cleared!");
+  };
+
+  const searchInputHomeRef = useRef(null)
+  const searchInputHeaderRef = useRef(null)
 
   const toggleTheme = useCallback(() => {
     setTheme(current => current === 'dark' ? 'light' : 'dark')
@@ -299,63 +326,25 @@ export default function App() {
         e.target.tagName === 'TEXTAREA' ||
         e.target.isContentEditable;
 
-      // 1. Ctrl + L / Cmd + L : Focus and Select Search Input (Always works everywhere)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
         e.preventDefault()
         const targetInput = searchInputHomeRef.current || searchInputHeaderRef.current
-        if (targetInput) {
-          targetInput.focus()
-          targetInput.select()
-        }
+        if (targetInput) { targetInput.focus(); targetInput.select(); }
         return
       }
 
-      // Stop handling other hotkeys if typing inside an interactive field
       if (isTyping) return
 
-      // 2. Ctrl + T : New Tab
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
-        e.preventDefault()
-        handleAddTab()
-        return
-      }
-
-      // 3. Ctrl + W : Close Tab
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') { e.preventDefault(); handleAddTab(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') {
         e.preventDefault()
-        setActiveTabId(currentId => {
-          if (currentId) handleCloseTab(currentId)
-          return currentId
-        })
+        setActiveTabId(currentId => { if (currentId) handleCloseTab(currentId); return currentId; })
         return
       }
-
-      // 4. Ctrl + 1 / 2 / 3 : Switch Tab Operating Modes
-      if ((e.ctrlKey || e.metaKey) && ['1', '2', '3'].includes(e.key)) {
-        e.preventDefault()
-        const modes = ['seo', 'ai', 'community']
-        handleModeChange(modes[parseInt(e.key) - 1])
-        return
-      }
-
-      // 5. Escape : Clear Search Query
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setActiveTabId(currentId => {
-          if (currentId) updateTab(currentId, { query: "" })
-          return currentId
-        })
-        return
-      }
-
-      // 6. '?' Key : Open Hotkeys Help Modal
-      if (e.key === '?') {
-        e.preventDefault()
-        setShowShortcutsHelp(true)
-        return
-      }
+      if ((e.ctrlKey || e.metaKey) && ['1', '2', '3'].includes(e.key)) { e.preventDefault(); const modes = ['seo', 'ai', 'community']; handleModeChange(modes[parseInt(e.key) - 1]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setActiveTabId(currentId => { if (currentId) updateTab(currentId, { query: "" }); return currentId; }); return; }
+      if (e.key === '?') { e.preventDefault(); setShowShortcutsHelp(true); return; }
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [appSessionId, handleModeChange, updateTab, handleAddTab, handleCloseTab])
@@ -364,17 +353,10 @@ export default function App() {
 
   function openInAppUrl(url, title = "Web Page") {
     if (!url) return
-    // SEC-02: Validate URL scheme — only allow http: and https:
     try {
       const parsed = new URL(url)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        console.warn('[SuperBrowser] Blocked non-http(s) URL:', parsed.protocol, url)
-        return
-      }
-    } catch {
-      console.warn('[SuperBrowser] Blocked malformed URL:', url)
-      return
-    }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') { return }
+    } catch { return }
     const bt = createNewTab(appSessionId); bt.browserUrl = url; bt.browserTitle = title; bt.title = (title || "Web").slice(0, 25); bt.query = url
     setTabs(p => [...p, bt]); setActiveTabId(bt.id)
     if (activeTab) contextManager.addVisitedPage(activeTabId, activeTab.sessionId, url, title, `Visited: ${url}`)
@@ -391,15 +373,16 @@ export default function App() {
 
       {/* Hand-drawn style TabBar with theme toggle */}
       <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabClick={(tabId) => { setShowPricing(false); setActiveTabId(tabId) }}
-        onCloseTab={handleCloseTab}
-        onAddTab={() => { setShowPricing(false); handleAddTab() }}
-        onShowHistory={() => { setShowPricing(false); setShowHistory(true) }}
-        onOpenPricing={() => { setShowHistory(false); setShowPricing(true) }}
-        theme={theme}
-        onToggleTheme={toggleTheme}
+       tabs={tabs}
+      activeTabId={activeTabId}
+      onTabClick={(tabId) => { setShowPricing(false); setActiveTabId(tabId) }}
+      onCloseTab={handleCloseTab}
+      onAddTab={() => { setShowPricing(false); handleAddTab() }}
+      onShowHistory={() => { setShowPricing(false); setShowHistory(true) }}
+      onOpenPricing={() => { setShowHistory(false); setShowPricing(true) }}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+      onWipeWorkspace={handleGlobalWorkspaceWipe}
       />
 
       {/* Main Content */}
@@ -411,7 +394,6 @@ export default function App() {
             <BrowserPanel url={activeTab.browserUrl} title={activeTab.browserTitle} onClose={() => updateTab(activeTabId, { browserUrl: "", browserTitle: "" })} />
           </div>
         ) : isNewTab ? (
-          /* Hand-drawn Centered Landing Page */
           <div className="flex-1 flex flex-col items-center justify-center p-4 animate-fade-in-up">
             <div className="relative mb-12">
               <div className="absolute inset-0 bg-white/70 blur-3xl -z-10 rounded-full scale-[1.3] pointer-events-none"></div>
@@ -446,20 +428,15 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* Active Search View */
           <div className="flex-1 flex flex-col min-h-0 bg-white shadow-xl relative z-10">
-            {/* Minimalist Top Header */}
             <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center gap-4 bg-white">
-               {/* Browser Navigation Controls */}
                <div className="flex items-center gap-1">
                  <button onClick={() => {
                    if (activeTab?.history && activeTab.history.length > 1) {
                      const prev = activeTab.history[activeTab.history.length - 2];
                      updateTab(activeTabId, { query: prev.query, activeMode: prev.mode, history: activeTab.history.slice(0, -1) });
                      setTimeout(() => handleSearch(activeTabId), 0);
-                   } else {
-                     goHome();
-                   }
+                   } else { goHome(); }
                  }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-black transition-colors" title="Back">
                    <ChevronLeftIcon />
                  </button>
@@ -467,7 +444,6 @@ export default function App() {
                    <ChevronRightIcon />
                  </button>
                  <button onClick={() => { if (activeTab?.query) handleSearch(activeTabId) }} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors" title="Reload">
-
                    <RefreshIcon />
                  </button>
                  <button onClick={goHome} className="p-2 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-black transition-colors" title="Home">
@@ -486,22 +462,10 @@ export default function App() {
                     placeholder="Search..."
                     className="flex-1 ml-3 outline-none text-base bg-transparent text-[var(--text-primary)]" />
                   {activeTab?.loading ? (
-                    <button 
-                      onClick={() => handleStop(activeTabId)} 
-                      className="ml-2 px-4 py-1.5 rounded-full bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
-                    >
-                      Stop
-                    </button>
+                    <button onClick={() => handleStop(activeTabId)} className="ml-2 px-4 py-1.5 rounded-full bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors">Stop</button>
                   ) : (
-                    <button 
-                      onClick={() => handleSearch(activeTabId)} 
-                      disabled={!activeTab?.query?.trim()}
-                      className="ml-2 px-4 py-1.5 rounded-full bg-[var(--action-primary)] text-white text-sm font-medium hover:bg-[var(--action-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Search
-                    </button>
+                    <button onClick={() => handleSearch(activeTabId)} disabled={!activeTab?.query?.trim()} className="ml-2 px-4 py-1.5 rounded-full bg-[var(--action-primary)] text-white text-sm font-medium hover:bg-[var(--action-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Search</button>
                   )}
-
                </div>
                <div className="flex items-center gap-2">
                  <button onClick={() => handleModeChange('seo')} className={`pill-btn px-4 py-1.5 ${activeTab?.activeMode === 'seo' ? 'active' : ''}`}>SEO</button>
@@ -510,25 +474,17 @@ export default function App() {
                </div>
             </div>
 
-            {/* Content Area */}
             <div className="flex-1 flex overflow-hidden bg-white">
                <div className="flex-1 overflow-auto p-6 md:p-10 max-w-5xl mx-auto">
                  {activeTab?.error && <div className="text-red-700 border border-red-200 bg-red-50 p-4 rounded-xl mb-6 text-sm max-w-4xl mx-auto">{activeTab.error}</div>}
                  
-                 {/* AI Options Bar inside results area for cleaner header */}
                  {activeTab?.activeMode === 'ai' && (
                     <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center">
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="text-sm font-medium text-[var(--text-secondary)]">Model:</span>
                         <ModelDropdown value={activeTab?.selectedModel || "default"} onChange={(model) => updateTab(activeTabId, { selectedModel: model })} />
-                        
                         {activeTab?.results && (
-                          <button 
-                            onClick={() => handleRegenerate(activeTabId)}
-                            disabled={activeTab?.loading || !activeTab?.lastQuery}
-                            className="pill-btn px-4 py-1.5 ml-3 text-xs flex items-center gap-1.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Regenerate Answer"
-                          >
+                          <button onClick={() => handleRegenerate(activeTabId)} disabled={activeTab?.loading || !activeTab?.lastQuery} className="pill-btn px-4 py-1.5 ml-3 text-xs flex items-center gap-1.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed" title="Regenerate Answer">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                             </svg>
@@ -544,15 +500,9 @@ export default function App() {
                </div>
 
                {activeTab?.showChat && (
-                 <ChatSidebar 
-                   tabId={activeTabId} 
-                   appSessionId={activeTab.sessionId} 
-                   onClose={() => updateTab(activeTabId, { showChat: false })}
-                   persona={activeTab?.selectedModel || "default"}
-                 />
+                 <ChatSidebar tabId={activeTabId} appSessionId={activeTab.sessionId} onClose={() => updateTab(activeTabId, { showChat: false })} persona={activeTab?.selectedModel || "default"} />
                )}
                
-               {/* History Panel Sidebar - Now accessed via browser menu */}
                {showHistory && (
                  <div className="w-80 border-l border-[var(--border-color)] bg-white p-4 overflow-y-auto">
                    <div className="flex items-center justify-between mb-4">
@@ -583,7 +533,7 @@ export default function App() {
 
 /* ── UI Components ── */
 
-function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHistory, onOpenPricing, theme, onToggleTheme }) {
+function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHistory, onOpenPricing, theme, onToggleTheme, onWipeWorkspace }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const nextTheme = theme === 'dark' ? 'light' : 'dark'
 
@@ -604,36 +554,37 @@ function TabBar({ tabs, activeTabId, onTabClick, onCloseTab, onAddTab, onShowHis
         </button>
       </div>
       <div className="flex items-center h-full border-l border-[var(--border-color)] relative">
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`px-5 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors ${isMenuOpen ? 'bg-[var(--bg-hover)]' : ''}`}
-        >
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`px-5 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors ${isMenuOpen ? 'bg-[var(--bg-hover)]' : ''}`} >
           BROWSER MENU
         </button>
-        {isMenuOpen && <BrowserMenu onClose={() => setIsMenuOpen(false)} onAddTab={onAddTab} onShowHistory={onShowHistory} onOpenPricing={onOpenPricing} />}
+        {isMenuOpen && (
+  <BrowserMenu 
+    onClose={() => setIsMenuOpen(false)} 
+    onAddTab={onAddTab} 
+    onShowHistory={onShowHistory} 
+    onOpenPricing={onOpenPricing} 
+    onWipeWorkspace={onWipeWorkspace} 
+  />
+)}
 
-        {/* Theme Toggle Button */}
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className="theme-toggle w-12 h-full flex items-center justify-center transition-colors"
-          aria-label={`Switch to ${nextTheme} mode`}
-          aria-pressed={theme === 'dark'}
-          title={`Switch to ${nextTheme} mode`}
-        >
+        
+        {/* Wipe Workspace Layout Button */}
+        <button 
+         onClick={onWipeWorkspace} 
+         className="mx-2 px-3 py-1.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded transition-all duration-150" 
+          title="Clear All Session Data"
+         >
+          Wipe Workspace
+        </button>
+        
+        <button type="button" onClick={onToggleTheme} className="theme-toggle w-12 h-full flex items-center justify-center transition-colors" aria-label={`Switch to ${nextTheme} mode`} aria-pressed={theme === 'dark'} title={`Switch to ${nextTheme} mode`}>
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
-
-        {/* Pricing Button */}
-        <button
-          onClick={() => { setIsMenuOpen(false); onOpenPricing() }}
-          className="px-4 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border-l border-[var(--border-color)]"
-          title="Pricing"
-        >
+        
+        <button onClick={() => { setIsMenuOpen(false); onOpenPricing() }} className="px-4 h-full text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors border-l border-[var(--border-color)]" title="Pricing">
           PRICING
         </button>
-
-        {/* Window Controls */}
+        
         <div className="flex h-full pl-1 border-l border-[var(--border-color)]">
           <button onClick={() => window.superBrowserDesktop?.minimize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Minimize"><MinusIcon /></button>
           <button onClick={() => window.superBrowserDesktop?.maximize?.()} className="w-12 h-full text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-colors" title="Maximize"><SquareIcon /></button>
@@ -736,10 +687,10 @@ function SEOResults({ results, onOpenLink, query = "" }) {
   )
 }
 
-function AIResults({ AntiquatedResults }) {
-  const answer = AntiquatedResults?.answer || ''
-  const isLiveData = AntiquatedResults?.live_data === true
-  const sourceCount = AntiquatedResults?.sources_scraped || 0
+function AIResults({ results }) {
+  const answer = results?.answer || ''
+  const isLiveData = results?.live_data === true
+  const sourceCount = results?.sources_scraped || 0
   return (
     <div className="max-w-3xl space-y-6 animate-fade-in-up">
       {answer ? (
@@ -760,7 +711,7 @@ function AIResults({ AntiquatedResults }) {
 }
 
 function ContextIndicator({ tabId, contextManager, onToggleInfo }) {
-  const summary = contextManager.getContextSummary(tabId)
+  const summary = contextManager?.getContextSummary?.(tabId) || { hasContext: false, queryCount: 0 }
   if (!summary.hasContext) return null
   return (
     <button onClick={onToggleInfo} className="text-xs px-3 py-1.5 rounded-full flex items-center gap-2 bg-[rgba(50,121,249,0.06)] text-[var(--action-primary)] hover:bg-[rgba(50,121,249,0.1)] transition-colors border border-[rgba(50,121,249,0.2)] font-medium">
@@ -807,7 +758,6 @@ function PersonaDropdown({ value, onChange, personas }) {
   )
 }
 
-
 const MODELS = [
   { id: "default",    name: "Llama 3.1 8B (Default)", desc: "Raw Groq — no persona" },
   { id: "chatgpt",    name: "ChatGPT (GPT-4o)",       desc: "Helpful, concise, friendly & practical" },
@@ -853,7 +803,6 @@ function ModelDropdown({ value, onChange }) {
     </div>
   )
 }
-
 
 function ContextWindow({ show, onClose, tabId, sessionId, contextManager }) {
   const [chatMessages, setChatMessages] = useState([])
@@ -1004,7 +953,6 @@ function BackendStatusBanner() { return null }
 function BrowserPanel({ url, title, onClose }) {
   const webviewRef = useRef(null)
 
-  // SEC-02: Block non-http(s) navigations inside the webview
   useEffect(() => {
     const webview = webviewRef.current
     if (!webview) return
@@ -1037,7 +985,6 @@ function BrowserPanel({ url, title, onClose }) {
         </div>
         <input value={url} readOnly className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-color)] text-sm rounded-lg px-3 py-1.5 outline-none text-[var(--text-secondary)]" />
       </div>
-      {/* SEC-02: allowpopups removed; popups are blocked at process level in main.cjs */}
       <webview
         ref={webviewRef}
         id={`webview-${url}`}
@@ -1131,7 +1078,7 @@ function PricingPage({ onClose }) {
   )
 }
 
-function BrowserMenu({ onClose, onAddTab, onShowHistory, onOpenPricing }) {
+function BrowserMenu({ onClose, onAddTab, onShowHistory, onOpenPricing, onWipeWorkspace }) {
   const menuRef = useRef()
   const [zoomLevel, setZoomLevel] = useState(100)
 
@@ -1218,18 +1165,8 @@ function BrowserMenu({ onClose, onAddTab, onShowHistory, onOpenPricing }) {
   return (
     <div ref={menuRef} className="absolute top-[44px] right-0 w-[300px] bg-white border border-[var(--border-color)] shadow-2xl rounded-bl-xl py-1 z-50 animate-fade-in-up origin-top-right">
       <MenuItem icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>} label="New tab" shortcut="Ctrl+T" onClick={onAddTab} />
-      <MenuItem 
-  icon={icons.window} 
-  label="New window" 
-  shortcut="Ctrl+N" 
-  onClick={() => window.electronAPI?.send('open-new-window')} 
-/>
-      <MenuItem 
-  icon={icons.incognito} 
-  label="New Incognito window" 
-  shortcut="Ctrl+Shift+N" 
-  onClick={() => window.electronAPI?.send('open-incognito-window')} 
-/>
+      <MenuItem icon={icons.window} label="New window" shortcut="Ctrl+N" onClick={() => window.electronAPI?.send('open-new-window')} />
+      <MenuItem icon={icons.incognito} label="New Incognito window" shortcut="Ctrl+Shift+N" onClick={() => window.electronAPI?.send('open-incognito-window')} />
       {divider}
       <ProfileMenu />
       {divider}
@@ -1258,6 +1195,17 @@ function BrowserMenu({ onClose, onAddTab, onShowHistory, onOpenPricing }) {
       <MenuItem icon={icons.pricing} label="Pricing" onClick={onOpenPricing} />
       <MenuItem icon={icons.settings} label="Settings" disabled />
       <MenuItem icon={icons.exit} label="Exit" onClick={() => window.superBrowserDesktop?.close?.() || window.close()} />
+      
+     {/* Global Workspace Wipe Button */}
+<div className="p-2 border-t border-gray-700/50 mt-auto">
+  <button
+    onClick={() => { onClose(); onWipeWorkspace?.(); }}
+    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-md transition-all duration-150 group"
+  >
+    <Trash2 className="w-3.5 h-3.5" />
+    Wipe Workspace
+  </button>
+</div>
     </div>
-  )
+  );
 }
