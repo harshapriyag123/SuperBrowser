@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react'
-import { useContextManager } from './useContextManager'
+import { clearEntireSessionWorkspace, useContextManager } from './useContextManager'
 import { getApiBase } from './config/apiBase'
 
 const LazyCommunityResults = lazy(() => import('./components/CommunityResults'))
@@ -852,6 +852,21 @@ export default function App() {
     }
   }, [appSessionId])
 
+  const handleGlobalWorkspaceWipe = useCallback(async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently clear all tabs, browsing history, and AI contexts? This cannot be undone."
+    )
+    if (!confirmed) return
+
+    try {
+      await clearEntireSessionWorkspace(appSessionId || "default-session")
+    } catch (error) {
+      console.warn("Backend workspace wipe failed; clearing local browser state anyway.", error)
+    }
+
+    handleDeleteBrowsingData()
+  }, [appSessionId, handleDeleteBrowsingData])
+
   useEffect(() => {
     if (!window.superBrowserDesktop?.app?.onFindInPage) return
     return window.superBrowserDesktop.app.onFindInPage(handleFindInPage)
@@ -1090,6 +1105,7 @@ export default function App() {
         isIncognito={isIncognito}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onWipeWorkspace={handleGlobalWorkspaceWipe}
       />
 
       {/* Main Content */}
@@ -1282,7 +1298,8 @@ function TabBar({
   onOpenSettings,
   isIncognito,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  onWipeWorkspace
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const nextTheme = theme === 'dark' ? 'light' : 'dark'
@@ -1355,8 +1372,18 @@ function TabBar({
             onPrint={onPrint}
             onOpenSettings={onOpenSettings}
             isIncognito={isIncognito}
+            onWipeWorkspace={onWipeWorkspace}
           />
         )}
+
+        <button
+          type="button"
+          onClick={onWipeWorkspace}
+          className="mx-2 px-3 py-1.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 rounded transition-colors"
+          title="Clear all session data"
+        >
+          Wipe Workspace
+        </button>
 
         {/* Theme Toggle Button */}
         <button
@@ -2546,7 +2573,8 @@ function BrowserMenu({
   onFindInPage,
   onPrint,
   onOpenSettings,
-  isIncognito
+  isIncognito,
+  onWipeWorkspace
 }) {
   const [zoomLevel, setZoomLevel] = useState(() => Number(document.documentElement.dataset.zoomLevel) || 100)
   const isElectron = Boolean(window.superBrowserDesktop?.isElectron)
@@ -2729,6 +2757,7 @@ function BrowserMenu({
       <MenuItem icon={icons.help} label="Help" onClick={openHelp} />
       <MenuItem icon={icons.pricing} label="Pricing" onClick={onOpenPricing} />
       <MenuItem icon={icons.settings} label="Settings" onClick={onOpenSettings} />
+      <MenuItem icon={icons.trash} label="Wipe Workspace" onClick={onWipeWorkspace} />
       <MenuItem icon={icons.exit} label="Exit" onClick={exitApp} />
     </div>
   )
