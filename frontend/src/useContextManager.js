@@ -2,7 +2,7 @@
  * Context Manager Hook
  * Manages browsing context for each tab - tracks queries, results, and visited pages
  */
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useRef, useEffect } from 'react'
 import { apiFetch, apiFetchJson } from './lib/apiFetch'
 
 export function useContextManager() {
@@ -163,7 +163,9 @@ export function useContextManager() {
     if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.getTab) {
       try {
         return await window.superBrowserDesktop.context.getTab(sessionId, tabId);
-      } catch {}
+      } catch {
+        // Fall back to the web API.
+      }
     }
     return apiFetchJson(`/api/context/get/${sessionId}/${tabId}`);
   }, []);
@@ -207,7 +209,9 @@ const loadContext = useCallback(async (tabId, sessionId) => {
     if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.getSession) {
       try {
         return await window.superBrowserDesktop.context.getSession(sessionId)
-      } catch {}
+      } catch {
+        // Fall back to the web API.
+      }
     }
     return apiFetchJson(`/api/context/session/${sessionId}`)
   }, [])
@@ -281,6 +285,7 @@ const loadContext = useCallback(async (tabId, sessionId) => {
     getContextSummary,
     fetchTabContext,
     fetchSessionContext,
+    wipeWorkspace,
     downloadSessionContext,
     loadContext,
     contextRestored
