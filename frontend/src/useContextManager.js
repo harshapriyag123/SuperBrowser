@@ -2,14 +2,15 @@
  * Context Manager Hook
  * Manages browsing context for each tab - tracks queries, results, and visited pages
  */
-import React, { useCallback, useMemo, useRef, useEffect } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { apiFetch, apiFetchJson } from './lib/apiFetch'
 
 export function useContextManager() {
   // In-memory context storage per tab
   const contextStore = useRef({});
+  const sessionSecrets = useRef({});
 
-  const [contextRestored, setContextRestored] = React.useState(false);
+  const [contextRestored, setContextRestored] = useState(false);
 
   // Initialize context for a tab
   const initializeTab = useCallback((tabId, sessionId) => {
@@ -25,14 +26,17 @@ export function useContextManager() {
 
   const startSession = useCallback(async (sessionId) => {
     if (!sessionId) return null
-    if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.startSession) {
-      return window.superBrowserDesktop.context.startSession(sessionId)
-    }
-    return apiFetchJson(`/api/context/session/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId })
-    })
+    const response = window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.startSession
+      ? await window.superBrowserDesktop.context.startSession(sessionId)
+      : await apiFetchJson('/api/context/session/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        })
+
+    const secret = response?.session?.secret
+    if (secret) sessionSecrets.current[sessionId] = secret
+    return response
   }, [])
 
   const stopSession = useCallback(async (sessionId, options = {}) => {
@@ -149,14 +153,13 @@ export function useContextManager() {
   // Clear context for a tab
   const clearTabContext = useCallback((tabId, sessionId) => {
     delete contextStore.current[tabId];
-    
+
     if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.clearTab) {
-      window.superBrowserDesktop.context.clearTab(sessionId, tabId).catch(() => {});
-      return;
+      return window.superBrowserDesktop.context.clearTab(sessionId, tabId);
     }
-    apiFetch(`/api/context/clear/${sessionId}/${tabId}`, {
+    return apiFetch(`/api/context/clear/${sessionId}/${tabId}`, {
       method: 'DELETE'
-    }).catch(() => {});
+    });
   }, []);
 
   const fetchTabContext = useCallback(async (tabId, sessionId) => {
@@ -170,19 +173,13 @@ export function useContextManager() {
     return apiFetchJson(`/api/context/get/${sessionId}/${tabId}`);
   }, []);
 
-  useEffect(() => {
-  // This would need to be called from a component with actual tabId/sessionId
-  // For now, we'll expose the function and let components handle it
-  // This is a placeholder - the actual loading happens in the component
-}, []);
-
-// Better approach: Add a loadContext function that components can call
-const loadContext = useCallback(async (tabId, sessionId) => {
+  // Load persisted context for the active tab.
+  const loadContext = useCallback(async (tabId, sessionId) => {
   if (!tabId || !sessionId) return;
   
   try {
     const data = await fetchTabContext(tabId, sessionId);
-    if (data && (data.queries?.length > 0 || data.visited_pages?.length > 0)) {
+    if (data && (data.queries?.length > 0 || data.results?.length > 0 || data.visited_pages?.length > 0)) {
       // Populate the context store
       if (!contextStore.current[tabId]) {
         contextStore.current[tabId] = {
@@ -213,7 +210,10 @@ const loadContext = useCallback(async (tabId, sessionId) => {
         // Fall back to the web API.
       }
     }
-    return apiFetchJson(`/api/context/session/${sessionId}`)
+    const secret = sessionSecrets.current[sessionId]
+    return apiFetchJson(`/api/context/session/${sessionId}`, {
+      headers: secret ? { 'X-Session-Secret': secret } : {},
+    })
   }, [])
 
   const downloadSessionContext = useCallback(async (sessionId) => {
@@ -221,7 +221,10 @@ const loadContext = useCallback(async (tabId, sessionId) => {
     if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.exportSession) {
       data = await window.superBrowserDesktop.context.exportSession(sessionId);
     } else {
-      data = await apiFetchJson(`/api/context/export/${sessionId}`);
+      const secret = sessionSecrets.current[sessionId]
+      data = await apiFetchJson(`/api/context/export/${sessionId}`, {
+        headers: secret ? { 'X-Session-Secret': secret } : {},
+      });
     }
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const safeSession = (sessionId || 'session').slice(0, 8)
@@ -251,9 +254,16 @@ const loadContext = useCallback(async (tabId, sessionId) => {
   }, [getContext]);
   
   const wipeWorkspace = useCallback(async (sessionId) => {
-    await clearEntireSessionWorkspace(sessionId);
-    window.location.reload(); 
-  }, []);
+    const response = await clearEntireSessionWorkspace(sessionId)
+    const replacementSecret = response?.session?.secret
+    if (replacementSecret) {
+      sessionSecrets.current[sessionId] = replacementSecret
+    } else {
+      delete sessionSecrets.current[sessionId]
+    }
+    contextStore.current = {}
+    return response
+  }, [])
 
   return useMemo(() => ({
     startSession,
@@ -292,15 +302,12 @@ const loadContext = useCallback(async (tabId, sessionId) => {
   ]);
 }
 
-// 
 export const clearEntireSessionWorkspace = async (sessionId) => {
-  try {
-    return await apiFetchJson(`/api/context/clear/${sessionId}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error during global workspace wipe:", error);
-    return null;
+  if (window.superBrowserDesktop?.isElectron && window.superBrowserDesktop?.context?.clearSession) {
+    return window.superBrowserDesktop.context.clearSession(sessionId)
   }
+  return apiFetchJson(`/api/context/clear/${sessionId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  })
 };

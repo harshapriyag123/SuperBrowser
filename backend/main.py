@@ -2,21 +2,24 @@ import os
 import sys
 from pathlib import Path
 
-# Support launching from the repository root with
-# `python -m uvicorn backend.main:app`.
-backend_dir = Path(__file__).resolve().parent
+from dotenv import load_dotenv
+
+backend_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+# Permit launching as `uvicorn backend.main:app` from the repository root.
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
+load_dotenv(backend_dir / ".env")
+
+runtime_env_file = os.getenv("SUPERBROWSER_ENV_FILE")
+if runtime_env_file:
+    load_dotenv(Path(runtime_env_file).expanduser())
 
 from utils.context_persistence import load_all_contexts
-from routers import pages  # ← This might already exist, check if it's missing
-
-from dotenv import load_dotenv
-load_dotenv()
+from routers import pages
 
 # Run database setup if database/context_db.py does not exist
 db_file = backend_dir / "database" / "context_db.py"
-if not db_file.exists():
+if not getattr(sys, "frozen", False) and not db_file.exists():
     import setup_database
 
 # 1. Added Depends here to handle authentication middleware
