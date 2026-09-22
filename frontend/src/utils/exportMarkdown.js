@@ -98,7 +98,7 @@ export function buildMarkdownExport({ mode, query = '', results = {}, createdAt 
   return sections.join('\n')
 }
 
-export function getMarkdownExportFilename(mode, query = '', date = new Date()) {
+export function getMarkdownExportFilename(mode, date = new Date()) {
   const datePart = date.toISOString().slice(0, 10)
   return `superbrowser-${slugify(mode || 'export')}-${datePart}.md`
 }
@@ -106,7 +106,7 @@ export function getMarkdownExportFilename(mode, query = '', date = new Date()) {
 export function downloadMarkdownExport({ mode, query, results }) {
   const createdAt = new Date()
   const markdown = buildMarkdownExport({ mode, query, results, createdAt })
-  const filename = getMarkdownExportFilename(mode, query, createdAt)
+  const filename = getMarkdownExportFilename(mode, createdAt)
   const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')

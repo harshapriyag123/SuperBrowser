@@ -1,5 +1,5 @@
 // frontend/src/components/ThemeToggle.jsx
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/themeContext';
 import styles from './ThemeToggle.module.css';
 
 /****
@@ -8,7 +8,7 @@ import styles from './ThemeToggle.module.css';
  * Uses emoji icons (🌙 for dark, ☀️ for light)
  ***/
 export function ThemeToggle() {
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
 
   return (
     <button
